@@ -343,20 +343,40 @@
                 <!-- Filters Row -->
                 <div class="flex flex-wrap items-center gap-3">
                     <div
-                        class="flex items-center gap-1.5 bg-white/[0.02] border border-white/[0.08] rounded-xl px-2.5 py-1.5">
-                        <span class="text-[9px] font-semibold text-white/40 uppercase tracking-wider">Cohort:</span>
+                        class="h-9 flex items-center gap-1.5 bg-white/[0.02] border border-white/[0.08] rounded-xl px-2.5">
+                        <span class="text-[9px] font-semibold text-white/40 uppercase tracking-wider font-mono">Cohort:</span>
                         <select id="filter-cohort"
-                            class="bg-transparent text-white text-xs font-semibold focus:outline-none cursor-pointer">
+                            class="bg-transparent text-white text-xs font-semibold focus:outline-none cursor-pointer py-1">
                             <option value="All" class="bg-[#050505] text-white">All Cohorts</option>
                         </select>
                     </div>
                     <div
-                        class="flex items-center gap-1.5 bg-white/[0.02] border border-white/[0.08] rounded-xl px-2.5 py-1.5">
-                        <span class="text-[9px] font-semibold text-white/40 uppercase tracking-wider">Course:</span>
+                        class="h-9 flex items-center gap-1.5 bg-white/[0.02] border border-white/[0.08] rounded-xl px-2.5">
+                        <span class="text-[9px] font-semibold text-white/40 uppercase tracking-wider font-mono">Course:</span>
                         <select id="filter-course"
-                            class="bg-transparent text-white text-xs font-semibold focus:outline-none cursor-pointer max-w-[160px] truncate">
+                            class="bg-transparent text-white text-xs font-semibold focus:outline-none cursor-pointer max-w-[160px] truncate py-1">
                             <option value="All" class="bg-[#050505] text-white">All Courses</option>
                         </select>
+                    </div>
+                    
+                    <!-- Custom Course Filter Input -->
+                    <div class="h-9 flex items-center gap-1.5 bg-white/[0.02] border border-white/[0.08] rounded-xl px-2.5">
+                        <span class="text-[9px] font-semibold text-white/40 uppercase tracking-wider font-mono">Custom Course:</span>
+                        <input type="text" id="custom-course-filter-input" placeholder="e.g. BUS-910, BUS-911"
+                            class="bg-transparent text-white text-xs font-semibold focus:outline-none placeholder-white/20 w-36 h-full py-1" />
+                        <button id="btn-add-custom-filter" type="button" class="text-white/40 hover:text-[#EE2C3C] transition-colors focus:outline-none ml-1">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Active Custom Filter Pill -->
+                    <div id="active-custom-filter-container" class="hidden h-9 flex items-center gap-1 bg-emerald-500/10 border border-emerald-500/20 text-white text-xs rounded-xl px-2.5 font-semibold transition-all" title="">
+                        <span id="active-custom-filter-label" class="text-[9px] font-bold text-emerald-400 uppercase tracking-wider font-mono flex-shrink-0">Active Filter Course</span>
+                        <button id="btn-clear-custom-filter" type="button" class="ml-1 text-white/40 hover:text-white font-bold cursor-pointer transition-colors focus:outline-none flex-shrink-0">
+                            &#x2715;
+                        </button>
                     </div>
                 </div>
 
@@ -844,6 +864,22 @@
             }
             if (courseVal !== "All") {
                 filtered = filtered.filter(q => q.course_name === courseVal);
+            }
+
+            // Apply custom course filter if active
+            const customFilterCookie = getCookie('dashboard_custom_course_filter');
+            if (customFilterCookie) {
+                const terms = customFilterCookie.split(',').map(t => t.trim().toLowerCase()).filter(Boolean);
+                if (terms.length > 0) {
+                    filtered = filtered.filter(q => {
+                        if (!q.course_name) return false;
+                        const courseClean = q.course_name.toLowerCase().replace(/[\s-_]+/g, '');
+                        return terms.some(term => {
+                            const termClean = term.replace(/[\s-_]+/g, '');
+                            return courseClean.includes(termClean) || termClean.includes(courseClean);
+                        });
+                    });
+                }
             }
 
             // Execute calculations
@@ -1943,6 +1979,96 @@
             
             requestAnimationFrame(step);
         }
+
+        // Cookie Helpers
+        function setCookie(name, value, days) {
+            let expires = "";
+            if (days) {
+                const date = new Date();
+                date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+                expires = "; expires=" + date.toUTCString();
+            }
+            document.cookie = name + "=" + encodeURIComponent(value || "") + expires + "; path=/; SameSite=Lax";
+        }
+
+        function getCookie(name) {
+            const nameEQ = name + "=";
+            const ca = document.cookie.split(';');
+            for (let i = 0; i < ca.length; i++) {
+                let c = ca[i];
+                while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+                if (c.indexOf(nameEQ) == 0) return decodeURIComponent(c.substring(nameEQ.length, c.length));
+            }
+            return null;
+        }
+
+        function initCustomCourseFilter() {
+            const savedFilter = getCookie('dashboard_custom_course_filter');
+            if (savedFilter) {
+                // Keep input box empty, active filter is shown in the pill
+                document.getElementById('custom-course-filter-input').value = '';
+                
+                const container = document.getElementById('active-custom-filter-container');
+                container.title = `Active courses: ${savedFilter}`;
+                
+                const count = savedFilter.split(',').map(t => t.trim()).filter(Boolean).length;
+                document.getElementById('active-custom-filter-label').innerText = `Active Filter Course (${count})`;
+                
+                container.classList.remove('hidden');
+            } else {
+                document.getElementById('active-custom-filter-container').classList.add('hidden');
+            }
+        }
+
+        // Custom Course Filter Event Listeners
+        document.getElementById('btn-add-custom-filter').addEventListener('click', () => {
+            const inputVal = document.getElementById('custom-course-filter-input').value.trim();
+            if (!inputVal) return;
+            
+            // Save to cookie (valid for 365 days)
+            setCookie('dashboard_custom_course_filter', inputVal, 365);
+            
+            // Show pill
+            const container = document.getElementById('active-custom-filter-container');
+            container.title = `Active courses: ${inputVal}`;
+            
+            const count = inputVal.split(',').map(t => t.trim()).filter(Boolean).length;
+            document.getElementById('active-custom-filter-label').innerText = `Active Filter Course (${count})`;
+            
+            container.classList.remove('hidden');
+            
+            // Clear input box value to prevent cutoff text display
+            document.getElementById('custom-course-filter-input').value = '';
+            
+            // Apply filters
+            applyFiltersAndRender();
+        });
+
+        document.getElementById('custom-course-filter-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('btn-add-custom-filter').click();
+            }
+        });
+
+        document.getElementById('btn-clear-custom-filter').addEventListener('click', () => {
+            // Delete cookie
+            setCookie('dashboard_custom_course_filter', '', -1);
+            
+            // Clear input
+            document.getElementById('custom-course-filter-input').value = '';
+            
+            // Hide pill
+            document.getElementById('active-custom-filter-container').classList.add('hidden');
+            
+            // Apply filters
+            applyFiltersAndRender();
+        });
+
+        // Initialize Custom Filter UI on Load
+        document.addEventListener('DOMContentLoaded', () => {
+            initCustomCourseFilter();
+        });
     </script>
 </body>
 

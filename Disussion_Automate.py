@@ -454,10 +454,10 @@ def collect_consolidated_rows(course_id, sis_id, course_name_api):
             else:
                 sla_status = "SLA Not Applicable" if not is_student_created else "Pending Response"
 
-            # Gather all unique repliers for the entire thread
+            # Gather all unique TA repliers for the entire thread
             names = []
             emails = []
-            for rep in all_replies:
+            for rep in ta_replies:
                 if rep["name"] not in names:
                     names.append(rep["name"])
                 if rep["email"] and rep["email"] not in emails:
@@ -556,6 +556,17 @@ def collect_consolidated_rows(course_id, sis_id, course_name_api):
                     else:
                         sla_status = "Pending Response"
 
+                    # Gather all unique TA repliers for the student post
+                    names = []
+                    emails = []
+                    for rep in ta_replies:
+                        if rep["name"] not in names:
+                            names.append(rep["name"])
+                        if rep["email"] and rep["email"] not in emails:
+                            emails.append(rep["email"])
+                    rep_names_str  = ", ".join(names)
+                    rep_emails_str = ", ".join(emails)
+
                     flat_rows.append({
                         "Cohort"            : cohort,
                         "Course Name"       : course_code,
@@ -569,8 +580,8 @@ def collect_consolidated_rows(course_id, sis_id, course_name_api):
                         "Duration (Hours)"  : duration if duration is not None else "",
                         "SLA Status"        : sla_status,
                         "First Responder"   : first_responder,
-                        "Replied By (Name)" : ", ".join(set(r["name"] for r in all_replies)),
-                        "Replied By (Email)": ", ".join(set(r["email"] for r in all_replies if r["email"]))
+                        "Replied By (Name)" : rep_names_str,
+                        "Replied By (Email)": rep_emails_str
                     })
 
     return flat_rows
