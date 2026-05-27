@@ -734,6 +734,7 @@ def build_excel_sheet(wb, flat_rows, sis_id, course_name):
     unique_learners = len(set(r["Learner Name"] for r in flat_rows if r["Learner Name"] and r["Learner Name"] != "(No student posts yet)"))
     total_queries   = len([r for r in flat_rows if r["Replied"] != "N/A" and r["Learner Name"] != "(No student posts yet)"])
     total_replied   = len([r for r in flat_rows if r["Replied"] == "Yes"])
+    pending_queries = len([r for r in flat_rows if r["Replied"] == "No"])
     durations       = [r["Duration (Hours)"] for r in flat_rows if isinstance(r["Duration (Hours)"], (int, float))]
     avg_course_time = round(sum(durations)/len(durations), 2) if durations else 0
 
@@ -760,6 +761,7 @@ def build_excel_sheet(wb, flat_rows, sis_id, course_name):
         ("Total Unique Learners", unique_learners),
         ("Total Queries Found", total_queries),
         ("Total Replied (TAs)", total_replied),
+        ("Pending Queries", pending_queries),
         ("Avg Course Response Time (Hrs)", avg_course_time)
     ]
     for i, (lab, val) in enumerate(overview, start=1):
@@ -770,7 +772,7 @@ def build_excel_sheet(wb, flat_rows, sis_id, course_name):
         for col in range(2, 5): ws.cell(row=sum_start+i, column=col).border = thin_border()
 
     # Table 2: TA Performance Breakdown
-    ta_start = sum_start + 6
+    ta_start = sum_start + 7
     ws.merge_cells(f"A{ta_start}:G{ta_start}")
     sh2 = ws[f"A{ta_start}"]; sh2.value = "TA PERFORMANCE BREAKDOWN (TREND ANALYSIS)"; sh2.font = Font(bold=True, color="FFFFFF"); sh2.fill = PatternFill("solid", fgColor="C00000"); sh2.alignment = Alignment(horizontal="center")
     sh2.border = thin_border()

@@ -141,6 +141,7 @@ def push_to_google_sheet(flat_rows, sis_id, course_name):
     unique_learners = len(set(r.get("Learner Name") for r in flat_rows if r.get("Learner Name") and r.get("Learner Name") != "(No student posts yet)"))
     total_queries   = len([r for r in flat_rows if r.get("Replied") != "N/A" and r.get("Learner Name") != "(No student posts yet)"])
     total_replied   = len([r for r in flat_rows if r.get("Replied") == "Yes"])
+    pending_queries = len([r for r in flat_rows if r.get("Replied") == "No"])
     durations       = [r.get("Duration (Hours)") for r in flat_rows if isinstance(r.get("Duration (Hours)"), (int, float))]
     avg_course_time = round(sum(durations)/len(durations), 2) if durations else 0
 
@@ -150,6 +151,7 @@ def push_to_google_sheet(flat_rows, sis_id, course_name):
     values.append(["Total Unique Learners", unique_learners] + [""] * 12)
     values.append(["Total Queries Found", total_queries] + [""] * 12)
     values.append(["Total Replied (TAs)", total_replied] + [""] * 12)
+    values.append(["Pending Queries", pending_queries] + [""] * 12)
     values.append(["Avg Course Response Time (Hrs)", avg_course_time] + [""] * 12)
 
     # Spacer
@@ -170,7 +172,7 @@ def push_to_google_sheet(flat_rows, sis_id, course_name):
         if isinstance(r.get("Duration (Hours)"), (int, float)):
             ta_stats[ta_name]["durs"].append(r["Duration (Hours)"])
 
-    ta_start = sum_start + 7
+    ta_start = sum_start + 8
     values.append(["TA PERFORMANCE BREAKDOWN (TREND ANALYSIS)"] + [""] * 13)
     values.append(["TA Name", "Replies", "On-Time", "Delayed", "Avg Time (Hrs)", "SLA Violation %"] + [""] * 8)
 
@@ -191,7 +193,7 @@ def push_to_google_sheet(flat_rows, sis_id, course_name):
         ws.merge_cells("A3:N3")
     
     ws.merge_cells(f"A{sum_start}:D{sum_start}")
-    for i in range(1, 5):
+    for i in range(1, 6):
         ws.merge_cells(f"B{sum_start+i}:D{sum_start+i}")
 
     ws.merge_cells(f"A{ta_start}:G{ta_start}")
@@ -280,7 +282,7 @@ def push_to_google_sheet(flat_rows, sis_id, course_name):
             borders=borders_all
         ))
 
-        for i in range(1, 5):
+        for i in range(1, 6):
             formatter.format_cell_range(ws, f"A{sum_start+i}:D{sum_start+i}", CellFormat(
                 textFormat=TextFormat(bold=(i==0), fontSize=10, foregroundColor=color_black),
                 verticalAlignment="MIDDLE",
