@@ -202,7 +202,12 @@ def get_course_users_with_emails(course_id):
     """Fetches all users in the course to get names, emails, and student IDs."""
     print("  Retrieving course directory (user emails & IDs)...")
     url   = f"{API_URL}/courses/{course_id}/users"
-    users = paginated_get(url, params={"include[]": ["email", "sis_user_id", "enrollments"], "per_page": 100})
+    params = {
+        "include[]": ["email", "sis_user_id", "enrollments"],
+        "enrollment_state[]": ["active", "invited", "completed", "inactive", "concluded"],
+        "per_page": 100
+    }
+    users = paginated_get(url, params=params)
     user_map = {}
     staff_ids = set()  # [PERF] Collect staff IDs in same pass — eliminates a separate API call
     for u in users:
@@ -338,7 +343,9 @@ def collect_consolidated_rows(course_id, sis_id, course_name_api):
     print(f"    {len(all_topics)} discussion topic(s) found.\n")
 
     # Group all discussion topics into a queue of (module_name, topic) tuples
+    # [FIX] Deduplicate topics across modules to avoid scraping the same topic multiple times
     topics_queue = []
+    queued_topic_ids = set()
     processed_topic_ids = set()
 
     # [PERF] Fetch all module items in parallel using ThreadPoolExecutor
@@ -358,8 +365,11 @@ def collect_consolidated_rows(course_id, sis_id, course_name_api):
                 and item.get("content_id") in topic_lookup
             ]
             for topic in disc_topics:
-                topics_queue.append((mod_name, topic))
-                processed_topic_ids.add(topic["id"])
+                tid = topic["id"]
+                if tid not in queued_topic_ids:
+                    queued_topic_ids.add(tid)
+                    topics_queue.append((mod_name, topic))
+                processed_topic_ids.add(tid)
 
     # Collect independent/orphan discussion topics that are not in any module
     unprocessed_topics = [t for t in all_topics if t["id"] not in processed_topic_ids]
@@ -367,19 +377,23 @@ def collect_consolidated_rows(course_id, sis_id, course_name_api):
         # Avoid processing Announcements (which Canvas treats as discussion topics with a flag)
         if topic.get("type") == "Announcement" or topic.get("is_announcement"):
             continue
-        topics_queue.append(("General / Independent Discussions", topic))
+        if topic["id"] not in queued_topic_ids:
+            queued_topic_ids.add(topic["id"])
+            topics_queue.append(("General / Independent Discussions", topic))
 
     flat_rows = []
+    seen_query_keys = set()
 
     # Process each topic in our consolidated queue
     for mod_name, topic in topics_queue:
         topic_title = topic.get("title", "Untitled Discussion")
+        topic_id = topic["id"]
         print(f"  Processing thread: [{mod_name}] >> {topic_title}")
 
         # Resolve topic author
         topic_author_id = topic.get("user_id") or (topic.get("author") or {}).get("id")
         topic_author_info = user_map.get(topic_author_id, {}) if topic_author_id else {}
-        topic_author_name = topic_author_info.get("name") or (topic.get("author") or {}).get("display_name") or f"User#{topic_author_id or 'Unknown'}"
+        topic_author_name = topic_author_info.get("name") or (topic.get("author") or {}).get("display_name") or ""
         topic_author_email = (topic_author_info.get("email") or "").strip().lower()
 
         # Check if topic was created by a student/learner
@@ -393,11 +407,12 @@ def collect_consolidated_rows(course_id, sis_id, course_name_api):
         # GROUP DISCUSSION SUPPORT
         # (In BUS courses, posts are often hidden inside Groups)
         # ────────────────────────────────────────────────────────
-        if topic.get("group_category_id") and not view:
-            # If this is a group discussion and the master topic is empty, search sub-groups
+        if topic.get("group_category_id"):
+            # Search sub-groups and merge views
             group_topics_url = f"{API_URL}/courses/{course_id}/discussion_topics/{topic['id']}/group_topics"
             group_topics = paginated_get(group_topics_url)
             for gt in group_topics:
+                processed_topic_ids.add(gt["id"])
                 _, g_view = get_full_view(course_id, gt["id"], is_group=True)
                 if g_view:
                     view.extend(g_view)
@@ -406,8 +421,15 @@ def collect_consolidated_rows(course_id, sis_id, course_name_api):
             # ────────────────────────────────────────────────────────
             # MODE A: Student-created Discussion Topic (e.g., Assignment Due Dates)
             # ────────────────────────────────────────────────────────
-            # The entire topic itself is the learner's query.
-            # Replies inside 'view' are responses.
+            # Skip invalid / empty student author
+            if not topic_author_name or topic_author_name.strip() in ("", "N/A", "Unknown", "User#None", "(No student posts yet)"):
+                continue
+
+            query_key = ("topic", topic_id)
+            if query_key in seen_query_keys:
+                continue
+            seen_query_keys.add(query_key)
+
             created_on = format_created_on(topic.get("created_at"))
 
             ta_replies = []
@@ -487,102 +509,103 @@ def collect_consolidated_rows(course_id, sis_id, course_name_api):
             # MODE B: Instructor/Staff-created Discussion Topic (e.g., Generative AI Playground)
             # ────────────────────────────────────────────────────────
             # The top-level entries inside 'view' are student queries.
+            # [FIX] Do NOT add artificial (No student posts yet) dummy rows if not view!
             if not view:
-                # Handle the case where the discussion topic is created but has no student posts yet
+                continue
+
+            for entry in view:
+                # [FIX] Skip deleted Canvas posts and empty placeholders
+                if entry.get("deleted") or (entry.get("message") is None and not entry.get("replies")):
+                    continue
+
+                author_id = entry.get("user_id")
+                # IMPORTANT: Skip if no author or entry itself was posted by staff
+                if not author_id or author_id in staff_ids:
+                    continue
+
+                p_info = participants.get(author_id, {})
+                u_info = user_map.get(author_id, {})
+
+                l_name  = u_info.get("name") or p_info.get("name")
+                l_email = (u_info.get("email") or p_info.get("email") or "").strip().lower()
+                l_sid   = u_info.get("student_id", "N/A")
+
+                # [FIX] Skip invalid / placeholder learner records
+                if not l_name or l_name.strip() in ("", "N/A", "Unknown", "User#None", "(No student posts yet)"):
+                    continue
+
+                # [FIX] Deduplicate on distinct query entry ID.
+                # If a learner raises TWO distinct queries in the same module/topic, each has a distinct entry ID and is preserved!
+                entry_id = entry.get("id")
+                query_key = ("entry", entry_id) if entry_id else ("entry_fallback", topic_id, author_id, entry.get("created_at"))
+                if query_key in seen_query_keys:
+                    continue
+                seen_query_keys.add(query_key)
+
+                raw_created = entry.get("created_at")
+                created_on  = format_created_on(raw_created)
+
+                # Check replies to this student post
+                raw_replies = entry.get("replies", [])
+                ta_replies = []
+                all_replies = []
+
+                for rp in raw_replies:
+                    rid = rp.get("user_id")
+                    ru_info = user_map.get(rid, {})
+                    rp_name = ru_info.get("name") or f"User#{rid}"
+                    rp_email = (ru_info.get("email") or "").strip().lower()
+
+                    is_ta = rp_email in TA_EMAILS_SET  # [PERF] O(1) frozenset lookup
+                    rep_det = {"name": rp_name, "email": rp_email, "time": rp.get("created_at")}
+                    if is_ta: ta_replies.append(rep_det)
+                    all_replies.append(rep_det)
+
+                raw_replied = None
+                first_responder = ""
+                if ta_replies:
+                    sorted_ta = sorted(ta_replies, key=lambda x: x["time"])
+                    raw_replied = sorted_ta[0]["time"]
+                    first_responder = sorted_ta[0]["name"]
+                    replied_on = format_replied_on(raw_replied)
+                    replied = "Yes"
+                else:
+                    replied = "No"
+                    replied_on = ""
+
+                duration = calculate_duration_hours(raw_created, raw_replied)
+                if duration is not None:
+                    sla_status = "Delayed Response" if duration > 24 else "On Time Response"
+                else:
+                    sla_status = "Pending Response"
+
+                # Gather all unique TA repliers for the student post
+                names = []
+                emails = []
+                for rep in ta_replies:
+                    if rep["name"] not in names:
+                        names.append(rep["name"])
+                    if rep["email"] and rep["email"] not in emails:
+                        emails.append(rep["email"])
+                rep_names_str  = ", ".join(names)
+                rep_emails_str = ", ".join(emails)
+
                 flat_rows.append({
                     "Cohort"            : cohort,
                     "Course Name"       : course_code,
                     "Topic"             : topic_title,
-                    "Learner Name"      : "(No student posts yet)",
-                    "Student ID"        : "N/A",
-                    "Learner Email"     : "",
-                    "Created On"        : "",
-                    "Replied"           : "N/A",
-                    "Replied On"        : "",
-                    "Duration (Hours)"  : "",
-                    "SLA Status"        : "N/A",
-                    "First Responder"   : "",
-                    "Replied By (Name)" : "",
-                    "Replied By (Email)": ""
+                    "Learner Name"      : l_name,
+                    "Student ID"        : l_sid,
+                    "Learner Email"     : l_email,
+                    "Created On"        : created_on,
+                    "Replied"           : replied,
+                    "Replied On"        : replied_on,
+                    "Duration (Hours)"  : duration if duration is not None else "",
+                    "SLA Status"        : sla_status,
+                    "First Responder"   : first_responder,
+                    "Replied By (Name)" : rep_names_str,
+                    "Replied By (Email)": rep_emails_str
                 })
-            else:
-                for entry in view:
-                    author_id = entry.get("user_id")
-                    # IMPORTANT: Skip if the entry itself was posted by staff (not a learner query)
-                    if author_id in staff_ids:
-                        continue
-
-                    p_info = participants.get(author_id, {})
-                    u_info = user_map.get(author_id, {})
-
-                    l_name  = u_info.get("name") or p_info.get("name") or f"User#{author_id}"
-                    l_email = (u_info.get("email") or p_info.get("email") or "").strip().lower()
-                    l_sid   = u_info.get("student_id", "N/A")
-                    
-                    raw_created = entry.get("created_at")
-                    created_on  = format_created_on(raw_created)
-
-                    # Check replies to this student post
-                    raw_replies = entry.get("replies", [])
-                    ta_replies = []
-                    all_replies = []
-
-                    for rp in raw_replies:
-                        rid = rp.get("user_id")
-                        ru_info = user_map.get(rid, {})
-                        rp_name = ru_info.get("name") or f"User#{rid}"
-                        rp_email = (ru_info.get("email") or "").strip().lower()
-                        
-                        is_ta = rp_email in TA_EMAILS_SET  # [PERF] O(1) frozenset lookup
-                        rep_det = {"name": rp_name, "email": rp_email, "time": rp.get("created_at")}
-                        if is_ta: ta_replies.append(rep_det)
-                        all_replies.append(rep_det)
-
-                    raw_replied = None
-                    first_responder = ""
-                    if ta_replies:
-                        sorted_ta = sorted(ta_replies, key=lambda x: x["time"])
-                        raw_replied = sorted_ta[0]["time"]
-                        first_responder = sorted_ta[0]["name"]
-                        replied_on = format_replied_on(raw_replied)
-                        replied = "Yes"
-                    else:
-                        replied = "No"
-                        replied_on = ""
-
-                    duration = calculate_duration_hours(raw_created, raw_replied)
-                    if duration is not None:
-                        sla_status = "Delayed Response" if duration > 24 else "On Time Response"
-                    else:
-                        sla_status = "Pending Response"
-
-                    # Gather all unique TA repliers for the student post
-                    names = []
-                    emails = []
-                    for rep in ta_replies:
-                        if rep["name"] not in names:
-                            names.append(rep["name"])
-                        if rep["email"] and rep["email"] not in emails:
-                            emails.append(rep["email"])
-                    rep_names_str  = ", ".join(names)
-                    rep_emails_str = ", ".join(emails)
-
-                    flat_rows.append({
-                        "Cohort"            : cohort,
-                        "Course Name"       : course_code,
-                        "Topic"             : topic_title,
-                        "Learner Name"      : l_name,
-                        "Student ID"        : l_sid,
-                        "Learner Email"     : l_email,
-                        "Created On"        : created_on,
-                        "Replied"           : replied,
-                        "Replied On"        : replied_on,
-                        "Duration (Hours)"  : duration if duration is not None else "",
-                        "SLA Status"        : sla_status,
-                        "First Responder"   : first_responder,
-                        "Replied By (Name)" : rep_names_str,
-                        "Replied By (Email)": rep_emails_str
-                    })
 
     return flat_rows
 
@@ -731,10 +754,10 @@ def build_excel_sheet(wb, flat_rows, sis_id, course_name):
     sum_start = last_row + 3
     
     # Calculate Metrics
-    unique_learners = len(set(r["Learner Name"] for r in flat_rows if r["Learner Name"] and r["Learner Name"] != "(No student posts yet)"))
-    total_queries   = len([r for r in flat_rows if r["Replied"] != "N/A" and r["Learner Name"] != "(No student posts yet)"])
-    total_replied   = len([r for r in flat_rows if r["Replied"] == "Yes"])
-    pending_queries = len([r for r in flat_rows if r["Replied"] == "No"])
+    unique_learners = len(set(r["Learner Name"] for r in flat_rows if r.get("Learner Name") and r["Learner Name"] not in ("(No student posts yet)", "N/A", "Unknown", "User#None")))
+    total_queries   = len(flat_rows)
+    total_replied   = len([r for r in flat_rows if r.get("Replied") == "Yes"])
+    pending_queries = len([r for r in flat_rows if r.get("Replied") == "No"])
     durations       = [r["Duration (Hours)"] for r in flat_rows if isinstance(r["Duration (Hours)"], (int, float))]
     avg_course_time = round(sum(durations)/len(durations), 2) if durations else 0
 
@@ -855,7 +878,7 @@ def main():
         flat_rows = collect_consolidated_rows(course_id, sis_id, course_name)
 
         # Check if we have any actual learner queries (not just placeholders)
-        has_real_data = any(r["Learner Name"] != "(No student posts yet)" for r in flat_rows)
+        has_real_data = any(r.get("Learner Name") not in ("(No student posts yet)", "N/A", "Unknown", "User#None", "") for r in flat_rows)
 
         if not flat_rows or not has_real_data:
             print(f"  [!] No student discussions found in this course. Skipping tab.")

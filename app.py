@@ -81,7 +81,7 @@ def run_audit(task_id, course_codes_input):
             # This calls the original function which has all the print statements we intercept!
             flat_rows = da.collect_consolidated_rows(course_id, sis_id, course_name)
             
-            has_real_data = any(r.get("Learner Name") != "(No student posts yet)" for r in flat_rows)
+            has_real_data = any(r.get("Learner Name") not in ("(No student posts yet)", "N/A", "Unknown", "User#None", "") for r in flat_rows)
 
             if not flat_rows or not has_real_data:
                 task_progress[task_id] = f"No discussions found in {sis_id}. Skipping..."
