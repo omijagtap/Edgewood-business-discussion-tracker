@@ -137,12 +137,16 @@ def push_to_google_sheet(flat_rows, sis_id, course_name):
     values.append([""] * 14)
     values.append([""] * 14)
 
-    # Overview calculations
-    unique_learners = len(set(r.get("Learner Name") for r in flat_rows if r.get("Learner Name") and r.get("Learner Name") not in ("(No student posts yet)", "N/A", "Unknown", "User#None")))
-    total_queries   = len(flat_rows)
-    total_replied   = len([r for r in flat_rows if r.get("Replied") == "Yes"])
-    pending_queries = len([r for r in flat_rows if r.get("Replied") == "No"])
-    durations       = [r.get("Duration (Hours)") for r in flat_rows if isinstance(r.get("Duration (Hours)"), (int, float))]
+    # Overview calculations - filter for valid learner rows to guarantee exact consistency
+    valid_rows = [
+        r for r in flat_rows 
+        if r.get("Learner Name") and r.get("Learner Name") not in ("(No student posts yet)", "N/A", "Unknown", "User#None", "")
+    ]
+    unique_learners = len(set(r.get("Learner Name") for r in valid_rows))
+    total_queries   = len(valid_rows)
+    total_replied   = len([r for r in valid_rows if r.get("Replied") == "Yes"])
+    pending_queries = len([r for r in valid_rows if r.get("Replied") == "No"])
+    durations       = [r.get("Duration (Hours)") for r in valid_rows if isinstance(r.get("Duration (Hours)"), (int, float))]
     avg_course_time = round(sum(durations)/len(durations), 2) if durations else 0
 
     sum_start = last_row + 3
@@ -355,6 +359,85 @@ def parse_date_string(date_str):
 
 
 
+# ──────────────────────────────────────────────────────────────────
+#  DYNAMIC TA DIRECTORY (from Google Sheet "TA Details" tab)
+# ──────────────────────────────────────────────────────────────────
+
+_ta_cache = {"emails": set(), "fetched_at": 0}
+TA_CACHE_TTL = 60  # Cache for 60 seconds
+
+FALLBACK_TA_EMAILS = [
+    "asharma@edgewood.edu",
+    "PKulkarni@edgewood.edu",
+    "seegupta@edgewood.edu",
+    "nsukhani@edgewood.edu",
+    "ppriyadarshani@edgewood.edu",
+    "ssahai@edgewood.edu",
+    "vpagaria@edgewood.edu",
+    "ssaluja@edgewood.edu",
+    "JSelvaraj@edgewood.edu",
+    "aghosh@edgewood.edu",
+    "pnema@edgewood.edu",
+    "MMehndiratta@edgewood.edu",
+    "mnaruka@edgewood.edu",
+    "CMedatwal@edgewood.edu",
+    "kkaur@edgewood.edu",
+    "arastogi@edgewood.edu",
+    "PElavarasu@edgewood.edu",
+    "mkaur@edgewood.edu",
+    "Mmagry@edgewood.edu",
+    "RUdhani@edgewood.edu",
+    "rmishra@edgewood.edu",
+    "RPrasad@edgewood.edu",
+    "SobJose@edgewood.edu",
+    "sonsharma@edgewood.edu",
+    "nareshsukhani@gmail.com",
+    "patolejayashree.1980@gmail.com",
+    "aruna.deshpande@gmail.com",
+    "Jpatole@edgewood.edu",
+    "jranjan@edgewood.edu",
+    "vpalmisano@edgewood.edu",
+    "AnkPandey@edgewood.edu",
+    "LMaxwell@edgewood.edu",
+]
+
+def get_ta_emails(force_refresh=False):
+    """Fetch active TA emails from Google Sheet 'TA Details' tab.
+    Caches result for TA_CACHE_TTL seconds. Falls back to FALLBACK_TA_EMAILS on error."""
+    import time as _time
+    now = _time.time()
+    if not force_refresh and _ta_cache["emails"] and (now - _ta_cache["fetched_at"]) < TA_CACHE_TTL:
+        return _ta_cache["emails"]
+
+    try:
+        gc = get_google_client()
+        sh = gc.open_by_key(SPREADSHEET_ID)
+        try:
+            ws = sh.worksheet("TA Details")
+            # Tab has ONE column only: 'TA Email' (header row 1, emails from row 2)
+            rows = ws.get_all_values()
+            email_regex = re.compile(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$')
+            sheet_emails = set()
+            for r in rows[1:]:  # skip header row (row 0 = row 1 in sheet)
+                val = r[0].strip().lower() if r else ""
+                if email_regex.match(val):
+                    sheet_emails.add(val)
+
+            if sheet_emails:
+                _ta_cache["emails"] = frozenset(sheet_emails)
+                _ta_cache["fetched_at"] = now
+                return _ta_cache["emails"]
+        except Exception:
+            pass
+    except Exception as e:
+        print(f"  [!] Warning: Failed to fetch TA emails from Google Sheet: {e}")
+
+    fallback_set = frozenset(e.strip().lower() for e in FALLBACK_TA_EMAILS if e)
+    _ta_cache["emails"] = fallback_set
+    _ta_cache["fetched_at"] = now
+    return fallback_set
+
+
 # In-memory cache for dashboard data
 _dashboard_cache = {"data": None, "fetched_at": 0}
 CACHE_TTL_SECONDS = 60  # Serve from cache for 60 seconds between Google Sheets calls
@@ -370,7 +453,6 @@ def get_dashboard_data():
     if _dashboard_cache["data"] is not None and (now - _dashboard_cache["fetched_at"]) < CACHE_TTL_SECONDS:
         return _dashboard_cache["data"]
 
-
     gc = get_google_client()
     sh = gc.open_by_key(SPREADSHEET_ID)
     worksheets = sh.worksheets()
@@ -380,12 +462,13 @@ def get_dashboard_data():
     with ThreadPoolExecutor(max_workers=8) as executor:
         results = executor.map(fetch_worksheet_data, worksheets)
         for title, values in results:
-            if values:
+            if values and title != "TA Details":
                 sheet_data_list.append((title, values))
 
     raw_queries = []
     unique_courses = set()
     unique_cohorts = set()
+    ta_emails_set = get_ta_emails()
 
     for title, values in sheet_data_list:
         if len(values) < 2:
@@ -441,10 +524,9 @@ def get_dashboard_data():
                 created_dt = parse_date_string(created_on)
                 created_dt_iso = created_dt.isoformat() if created_dt else None
 
-                # Validate first responder using TA_EMAILS_SET
-                import Disussion_Automate as da
+                # Validate first responder using dynamic TA emails
                 r_emails = [e.strip().lower() for e in replied_by_email.split(",") if e.strip()]
-                ta_emails_in_row = [e for e in r_emails if e in da.TA_EMAILS_SET]
+                ta_emails_in_row = [e for e in r_emails if e in ta_emails_set]
                 
                 if not ta_emails_in_row:
                     first_responder = ""

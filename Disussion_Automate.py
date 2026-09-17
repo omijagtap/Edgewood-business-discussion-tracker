@@ -57,39 +57,47 @@ SESSION      = requests.Session()
 SESSION.headers.update(HEADERS)
 SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
 
-# Define TA Email addresses to check against (case-insensitive)
-TA_EMAILS = [
-    "asharma@edgewood.edu",
-    "PKulkarni@edgewood.edu",
-    "seegupta@edgewood.edu",
-    "nsukhani@edgewood.edu",
-    "ppriyadarshani@edgewood.edu",
-    "ssahai@edgewood.edu",
-    "vpagaria@edgewood.edu",
-    "ssaluja@edgewood.edu",
-    "JSelvaraj@edgewood.edu",
-    "aghosh@edgewood.edu",
-    "pnema@edgewood.edu",
-    "MMehndiratta@edgewood.edu",
-    "mnaruka@edgewood.edu",
-    "CMedatwal@edgewood.edu",
-    "kkaur@edgewood.edu",
-    "arastogi@edgewood.edu",
-    "PElavarasu@edgewood.edu",
-    "mkaur@edgewood.edu",
-    "Mmagry@edgewood.edu",
-    "RUdhani@edgewood.edu",
-    "rmishra@edgewood.edu",
-    "RPrasad@edgewood.edu",
-    "SobJose@edgewood.edu",
-    "sonsharma@edgewood.edu",
-    "nareshsukhani@gmail.com",
-    "patolejayashree.1980@gmail.com",
-    "aruna.deshpande@gmail.com",
-    "Jpatole@edgewood.edu",
-]
-# [PERF] Pre-compute as lowercase frozenset for O(1) lookups instead of O(n) per check
-TA_EMAILS_SET = frozenset(e.strip().lower() for e in TA_EMAILS if e)
+try:
+    import sheets_helper
+except ImportError:
+    sheets_helper = None
+
+def get_current_ta_emails():
+    """Retrieve dynamic TA email set from Google Sheets (TA Details tab) with fallback."""
+    if sheets_helper and hasattr(sheets_helper, "get_ta_emails"):
+        try:
+            return sheets_helper.get_ta_emails()
+        except Exception:
+            pass
+    # Fallback to local safety set
+    return frozenset(e.strip().lower() for e in [
+        "asharma@edgewood.edu", "PKulkarni@edgewood.edu", "seegupta@edgewood.edu",
+        "nsukhani@edgewood.edu", "ppriyadarshani@edgewood.edu", "ssahai@edgewood.edu",
+        "vpagaria@edgewood.edu", "ssaluja@edgewood.edu", "JSelvaraj@edgewood.edu",
+        "aghosh@edgewood.edu", "pnema@edgewood.edu", "MMehndiratta@edgewood.edu",
+        "mnaruka@edgewood.edu", "CMedatwal@edgewood.edu", "kkaur@edgewood.edu",
+        "arastogi@edgewood.edu", "PElavarasu@edgewood.edu", "mkaur@edgewood.edu",
+        "Mmagry@edgewood.edu", "RUdhani@edgewood.edu", "rmishra@edgewood.edu",
+        "RPrasad@edgewood.edu", "SobJose@edgewood.edu", "sonsharma@edgewood.edu",
+        "nareshsukhani@gmail.com", "patolejayashree.1980@gmail.com", "aruna.deshpande@gmail.com",
+        "Jpatole@edgewood.edu", "jranjan@edgewood.edu", "vpalmisano@edgewood.edu",
+        "AnkPandey@edgewood.edu", "LMaxwell@edgewood.edu"
+    ] if e)
+
+# Legacy alias for backward compatibility
+TA_EMAILS_SET = get_current_ta_emails()
+
+def extract_all_replies(replies_list):
+    """Recursively extracts all replies including nested threaded replies."""
+    flat = []
+    if not replies_list:
+        return flat
+    for r in replies_list:
+        flat.append(r)
+        if r.get("replies"):
+            flat.extend(extract_all_replies(r["replies"]))
+    return flat
+
 
 # ──────────────────────────────────────────────────────────────────
 #  CANVAS API HELPERS
@@ -329,6 +337,7 @@ def get_cohort_and_course(sis_id, course_name_api):
 
 def collect_consolidated_rows(course_id, sis_id, course_name_api):
     cohort, course_code = get_cohort_and_course(sis_id, course_name_api)
+    ta_emails_set = get_current_ta_emails()
 
     # [PERF] Single API call extracts both user_map AND staff_ids — saves one full paginated request
     user_map, staff_ids = get_course_users_with_emails(course_id)
@@ -398,8 +407,9 @@ def collect_consolidated_rows(course_id, sis_id, course_name_api):
 
         # Check if topic was created by a student/learner
         is_student_created = False
-        if topic_author_id and topic_author_id not in staff_ids:
-            is_student_created = True
+        if topic_author_id:
+            if topic_author_id not in staff_ids and topic_author_email not in ta_emails_set:
+                is_student_created = True
 
         participants, view = get_full_view(course_id, topic["id"])
 
@@ -435,7 +445,7 @@ def collect_consolidated_rows(course_id, sis_id, course_name_api):
             ta_replies = []
             all_replies = []
 
-            for r in view:
+            for r in extract_all_replies(view):
                 rid      = r.get("user_id")
                 r_p_info = participants.get(rid, {})
                 r_u_info = user_map.get(rid, {})
@@ -444,7 +454,8 @@ def collect_consolidated_rows(course_id, sis_id, course_name_api):
                 r_email = (r_u_info.get("email") or r_p_info.get("email") or "").strip().lower()
                 r_time  = r.get("created_at", "")
 
-                is_ta = r_email in TA_EMAILS_SET  # [PERF] O(1) frozenset lookup
+                # TA Check: in live Google Sheet TA directory OR enrolled as staff in Canvas
+                is_ta = (r_email in ta_emails_set) or (rid in staff_ids)
 
                 reply_details = {
                     "name": r_name,
@@ -519,16 +530,16 @@ def collect_consolidated_rows(course_id, sis_id, course_name_api):
                     continue
 
                 author_id = entry.get("user_id")
-                # IMPORTANT: Skip if no author or entry itself was posted by staff
-                if not author_id or author_id in staff_ids:
-                    continue
-
                 p_info = participants.get(author_id, {})
                 u_info = user_map.get(author_id, {})
 
                 l_name  = u_info.get("name") or p_info.get("name")
                 l_email = (u_info.get("email") or p_info.get("email") or "").strip().lower()
                 l_sid   = u_info.get("student_id", "N/A")
+
+                # IMPORTANT: Skip if no author or entry itself was posted by staff (by ID or Email)
+                if not author_id or author_id in staff_ids or l_email in ta_emails_set:
+                    continue
 
                 # [FIX] Skip invalid / placeholder learner records
                 if not l_name or l_name.strip() in ("", "N/A", "Unknown", "User#None", "(No student posts yet)"):
@@ -545,8 +556,8 @@ def collect_consolidated_rows(course_id, sis_id, course_name_api):
                 raw_created = entry.get("created_at")
                 created_on  = format_created_on(raw_created)
 
-                # Check replies to this student post
-                raw_replies = entry.get("replies", [])
+                # Check replies to this student post (including nested threaded replies)
+                raw_replies = extract_all_replies(entry.get("replies", []))
                 ta_replies = []
                 all_replies = []
 
@@ -556,7 +567,8 @@ def collect_consolidated_rows(course_id, sis_id, course_name_api):
                     rp_name = ru_info.get("name") or f"User#{rid}"
                     rp_email = (ru_info.get("email") or "").strip().lower()
 
-                    is_ta = rp_email in TA_EMAILS_SET  # [PERF] O(1) frozenset lookup
+                    # TA Check: in live Google Sheet TA directory OR enrolled as staff in Canvas
+                    is_ta = (rp_email in ta_emails_set) or (rid in staff_ids)
                     rep_det = {"name": rp_name, "email": rp_email, "time": rp.get("created_at")}
                     if is_ta: ta_replies.append(rep_det)
                     all_replies.append(rep_det)
@@ -753,12 +765,16 @@ def build_excel_sheet(wb, flat_rows, sis_id, course_name):
     # ── Summary Analysis Table ─────────────────────────────────────
     sum_start = last_row + 3
     
-    # Calculate Metrics
-    unique_learners = len(set(r["Learner Name"] for r in flat_rows if r.get("Learner Name") and r["Learner Name"] not in ("(No student posts yet)", "N/A", "Unknown", "User#None")))
-    total_queries   = len(flat_rows)
-    total_replied   = len([r for r in flat_rows if r.get("Replied") == "Yes"])
-    pending_queries = len([r for r in flat_rows if r.get("Replied") == "No"])
-    durations       = [r["Duration (Hours)"] for r in flat_rows if isinstance(r["Duration (Hours)"], (int, float))]
+    # Calculate Metrics - filter for valid learner rows to guarantee exact consistency
+    valid_rows = [
+        r for r in flat_rows 
+        if r.get("Learner Name") and r.get("Learner Name") not in ("(No student posts yet)", "N/A", "Unknown", "User#None", "")
+    ]
+    unique_learners = len(set(r["Learner Name"] for r in valid_rows))
+    total_queries   = len(valid_rows)
+    total_replied   = len([r for r in valid_rows if r.get("Replied") == "Yes"])
+    pending_queries = len([r for r in valid_rows if r.get("Replied") == "No"])
+    durations       = [r["Duration (Hours)"] for r in valid_rows if isinstance(r.get("Duration (Hours)"), (int, float))]
     avg_course_time = round(sum(durations)/len(durations), 2) if durations else 0
 
     # TA Breakdown Calculation

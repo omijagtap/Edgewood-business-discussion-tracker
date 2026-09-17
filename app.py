@@ -58,6 +58,10 @@ def run_audit(task_id, course_codes_input):
             task_progress[task_id] = "ERROR: API connection failed. Check your token."
             return
 
+        # Fetch latest TA directory from Google Sheet to ensure new TAs are immediately active
+        task_progress[task_id] = "Syncing Active TA Directory from Google Sheet..."
+        sheets_helper.get_ta_emails(force_refresh=True)
+
         wb = openpyxl.Workbook()
         processed_count = 0
 
