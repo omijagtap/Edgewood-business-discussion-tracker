@@ -1,91 +1,45 @@
 """
-======================================================================
- Edgewood Canvas - Discussion Forum Report (Consolidated Layout)
-======================================================================
- Usage: python Disussion_Automate.py
-        OR: python Disussion_Automate.py "EDU-862-UED4--Spring-2026"
-
- Output: A consolidated Excel file with the exact requested format:
-         Cohort | Course Name | Topic | Learner Name | Created On | Replied | Replied On | Replied By Name | Replied By Email
-======================================================================
+=============================================================================
+EDGEWOOD COLLEGE - DISCUSSION BOARD AUDIT TOOL (BUSINESS TRACKER)
+Enhanced Canvas API Automation with Dynamic TA Mapping, 24-Hour SLA Validation,
+Nested Threaded Replies Support, Multi-Tab Output, and Google Sheets Sync.
+=============================================================================
 """
 
-import sys, io
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
-
 import os
+import sys
 import re
 import requests
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import sheets_helper
 
-try:
-    import openpyxl
-    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-    from openpyxl.utils import get_column_letter
-except ImportError:
-    print("[!] openpyxl not found. Installing...")
-    import subprocess
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "openpyxl"])
-    import openpyxl
-    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-    from openpyxl.utils import get_column_letter
-
-# Load environment variables
 try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
-    import subprocess
-    import sys
-    try:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "python-dotenv"])
-        from dotenv import load_dotenv
-        load_dotenv()
-    except Exception:
-        pass
+    pass
+
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 
 # ──────────────────────────────────────────────────────────────────
-#  CONFIG
+#  CONFIG & CONSTANTS
 # ──────────────────────────────────────────────────────────────────
+
 API_URL      = os.getenv("CANVAS_API_URL", "https://edgewood.instructure.com/api/v1")
 ACCESS_TOKEN = os.getenv("CANVAS_ACCESS_TOKEN")
-HEADERS      = {"Authorization": f"Bearer {ACCESS_TOKEN}" if ACCESS_TOKEN else ""}
-# [PERF] Persistent HTTP session — reuses TCP connections across all API calls
-SESSION      = requests.Session()
+
+HEADERS = {
+    "Authorization": f"Bearer {ACCESS_TOKEN}",
+    "Accept"       : "application/json"
+}
+
+SESSION = requests.Session()
 SESSION.headers.update(HEADERS)
 SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
 
-try:
-    import sheets_helper
-except ImportError:
-    sheets_helper = None
-
-def get_current_ta_emails():
-    """Retrieve dynamic TA email set from Google Sheets (TA Details tab) with fallback."""
-    if sheets_helper and hasattr(sheets_helper, "get_ta_emails"):
-        try:
-            return sheets_helper.get_ta_emails()
-        except Exception:
-            pass
-    # Fallback to local safety set
-    return frozenset(e.strip().lower() for e in [
-        "asharma@edgewood.edu", "PKulkarni@edgewood.edu", "seegupta@edgewood.edu",
-        "nsukhani@edgewood.edu", "ppriyadarshani@edgewood.edu", "ssahai@edgewood.edu",
-        "vpagaria@edgewood.edu", "ssaluja@edgewood.edu", "JSelvaraj@edgewood.edu",
-        "aghosh@edgewood.edu", "pnema@edgewood.edu", "MMehndiratta@edgewood.edu",
-        "mnaruka@edgewood.edu", "CMedatwal@edgewood.edu", "kkaur@edgewood.edu",
-        "arastogi@edgewood.edu", "PElavarasu@edgewood.edu", "mkaur@edgewood.edu",
-        "Mmagry@edgewood.edu", "RUdhani@edgewood.edu", "rmishra@edgewood.edu",
-        "RPrasad@edgewood.edu", "SobJose@edgewood.edu", "sonsharma@edgewood.edu",
-        "nareshsukhani@gmail.com", "patolejayashree.1980@gmail.com", "aruna.deshpande@gmail.com",
-        "Jpatole@edgewood.edu", "jranjan@edgewood.edu", "vpalmisano@edgewood.edu",
-        "AnkPandey@edgewood.edu", "LMaxwell@edgewood.edu"
-    ] if e)
-
-# Legacy alias for backward compatibility
-TA_EMAILS_SET = get_current_ta_emails()
 
 def extract_all_replies(replies_list):
     """Recursively extracts all replies including nested threaded replies."""
@@ -95,7 +49,7 @@ def extract_all_replies(replies_list):
     for r in replies_list:
         flat.append(r)
         if r.get("replies"):
-            flat.extend(extract_all_replies(r["replies"]))
+            flat.extend(extract_all_replies(r.get("replies")))
     return flat
 
 
@@ -103,211 +57,234 @@ def extract_all_replies(replies_list):
 #  CANVAS API HELPERS
 # ──────────────────────────────────────────────────────────────────
 
-def paginated_get(url, params=None):
-    results = []
-    if params is None:
-        params = {}
-    params.setdefault("per_page", 100)
-    while url:
-        try:
-            resp = SESSION.get(url, params=params)  # [PERF] uses persistent session
-            if resp.status_code != 200:
-                # Log error for better RCA
-                if resp.status_code == 401:
-                    print(f"  [!] API Unauthorized (401). Check your ACCESS_TOKEN.")
-                break
-            data = resp.json()
-            if isinstance(data, list):
-                results.extend(data)
-            elif isinstance(data, dict):
-                results.append(data)
-            url    = resp.links.get("next", {}).get("url")
-            params = {}
-        except Exception as e:
-            print(f"  [!] API Request failed: {e}")
-            break
-    return results
-
-
 def check_connection():
-    """Verify if the token is valid and who it belongs to."""
-    print("  Verifying API connection...")
-    url = f"{API_URL}/users/self/profile"
+    """Verify Canvas API credentials."""
+    if not ACCESS_TOKEN:
+        print("\n  [!] ERROR: CANVAS_ACCESS_TOKEN is missing from .env")
+        return False
     try:
-        resp = SESSION.get(url)  # [PERF] uses persistent session
-        if resp.status_code == 200:
-            user = resp.json()
-            print(f"  [v] Connected as: {user.get('name')} ({user.get('login_id')})")
+        r = SESSION.get(f"{API_URL}/users/self", timeout=10)
+        if r.status_code == 200:
+            user = r.json()
+            print(f"  Connected to Canvas as: {user.get('name', 'Unknown')} (ID: {user.get('id')})")
             return True
-        else:
-            print(f"  [!] Connection failed (Status {resp.status_code})")
-            print(f"      Response: {resp.text}")
+        elif r.status_code == 401:
+            print("\n  [!] ERROR: Invalid or expired access token (401 Unauthorized).")
             return False
-    except Exception as e:
-        print(f"  [!] Connection error: {e}")
+        else:
+            print(f"\n  [!] Connection failed with HTTP {r.status_code}: {r.text[:200]}")
+            return False
+    except requests.exceptions.RequestException as e:
+        print(f"\n  [!] Network error connecting to Canvas: {e}")
         return False
 
 
-def find_course(sis_course_id):
-    """Enhanced search to find courses by SIS ID, Course Code, or Name."""
-    target_clean = str(sis_course_id).strip()
-    
-    # 1. Try direct SIS lookup with variations
-    # We try: Exact, Dash variations (-- vs -), and Space vs Dash variations
-    variations = {target_clean}
-    
-    # Handle dash variations
-    if "-Spring" in target_clean and "--Spring" not in target_clean:
-        variations.add(target_clean.replace("-Spring", "--Spring"))
-    elif "--Spring" in target_clean:
-        variations.add(target_clean.replace("--Spring", "-Spring"))
-    
-    # Handle space variations (e.g. "Spring 2026" -> "Spring-2026")
-    if " " in target_clean:
-        variations.add(target_clean.replace(" ", "-"))
-    if "-" in target_clean:
-        variations.add(target_clean.replace("-", " "))
+def find_course(sis_id):
+    """Find course by SIS ID using targeted API search."""
+    # 1. Direct sis_course_id lookup
+    url = f"{API_URL}/courses/sis_course_id:{sis_id}"
+    try:
+        r = SESSION.get(url, timeout=15)
+        if r.status_code == 200:
+            return r.json()
+    except requests.exceptions.RequestException:
+        pass
 
-    for var in variations:
-        url  = f"{API_URL}/courses/sis_course_id:{var}"
-        resp = SESSION.get(url)  # [PERF] uses persistent session
-        if resp.status_code == 200:
-            return resp.json()
+    # 2. Search query fallback
+    url = f"{API_URL}/accounts/self/courses"
+    params = {"search_term": sis_id, "per_page": 20}
+    try:
+        r = SESSION.get(url, params=params, timeout=15)
+        if r.status_code == 200:
+            for c in r.json():
+                if (c.get("sis_course_id") or "").strip().lower() == sis_id.strip().lower():
+                    return c
+                if sis_id.strip().lower() in (c.get("course_code") or "").strip().lower():
+                    return c
+    except requests.exceptions.RequestException:
+        pass
 
-    # 2. Broad search across visible courses (expanded states)
-    print(f"  Direct lookup failed. Searching all courses for '{target_clean}'...")
-    search_params = {
-        "search_term": target_clean,
-        "state[]": ["available", "completed", "claimed", "concluded", "unpublished"]
-    }
-    courses = paginated_get(f"{API_URL}/courses", params=search_params)
-    if courses:
-        return courses[0]
-
-    # 3. Manual Fuzzy Match + Diagnostics
-    all_courses = paginated_get(f"{API_URL}/courses", params={"state[]": ["available", "completed", "claimed", "concluded", "unpublished"]})
-    
-    if not all_courses:
-        print("  [!] Your token cannot see ANY active or concluded courses in this account.")
-        return None
-
-    for c in all_courses:
-        c_sis  = (c.get("sis_course_id", "") or "").lower()
-        c_code = (c.get("course_code", "") or "").lower()
-        c_name = (c.get("name", "") or "").lower()
-        t_low  = target_clean.lower()
-        
-        # Check for partial matches or matches with different separators
-        if t_low in c_sis or t_low in c_code or t_low in c_name \
-           or c_sis in t_low or c_code in t_low or t_low.replace(" ", "-") in c_sis:
-            return c
-            
-    print(f"  [!] No match found for '{target_clean}'.")
     return None
 
 
 def get_course_users_with_emails(course_id):
-    """Fetches all users in the course to get names, emails, and student IDs."""
-    print("  Retrieving course directory (user emails & IDs)...")
-    url   = f"{API_URL}/courses/{course_id}/users"
-    params = {
-        "include[]": ["email", "sis_user_id", "enrollments"],
-        "enrollment_state[]": ["active", "invited", "completed", "inactive", "concluded"],
-        "per_page": 100
-    }
-    users = paginated_get(url, params=params)
-    user_map = {}
-    staff_ids = set()  # [PERF] Collect staff IDs in same pass — eliminates a separate API call
-    for u in users:
-        uid = u.get("id")
-        if uid:
-            user_map[uid] = {
-                "name"      : u.get("name", "Unknown"),
-                "email"     : u.get("email") or u.get("login_id") or "",
-                "student_id": u.get("sis_user_id") or u.get("login_id") or "N/A"
-            }
-            # [PERF] Check enrollments to identify staff — avoids separate get_course_staff_ids call
-            enrollments = u.get("enrollments", [])
-            for enr in enrollments:
-                e_type = enr.get("type", "").lower()
-                if e_type in ("teacherenrollment", "taenrollment", "designerenrollment"):
-                    staff_ids.add(uid)
-                    break
+    """
+    [PERF] Single API call with include[]=email that extracts BOTH:
+      1. user_map  : {user_id: {"name": ..., "email": ...}}
+      2. staff_ids : set of user_ids with Teacher/TA/Facilitator enrollment
+    Saves one full paginated API traversal per course!
+    """
+    user_map  = {}
+    staff_ids = set()
+    staff_types = {"TaEnrollment", "TeacherEnrollment", "DesignerEnrollment"}
+
+    url    = f"{API_URL}/courses/{course_id}/users"
+    params = {"per_page": 100, "include[]": ["email", "enrollments"]}
+
+    while url:
+        try:
+            r = SESSION.get(url, params=params, timeout=20)
+            if r.status_code != 200:
+                break
+            for u in r.json():
+                uid   = u["id"]
+                name  = u.get("name") or u.get("sortable_name") or f"User#{uid}"
+                email = (u.get("email") or u.get("login_id") or "").strip().lower()
+                user_map[uid] = {
+                    "name"      : name,
+                    "email"     : email,
+                    "student_id": u.get("sis_user_id") or "N/A"
+                }
+
+                # Check enrollments directly from the user record
+                for e in u.get("enrollments", []):
+                    if e.get("role") in staff_types or e.get("type") in staff_types:
+                        staff_ids.add(uid)
+                        break
+
+            # Handle pagination
+            url = None
+            params = {}
+            if "next" in r.links:
+                url = r.links["next"]["url"]
+        except requests.exceptions.RequestException:
+            break
+
     return user_map, staff_ids
 
 
-def get_full_view(course_id, topic_id, is_group=False):
-    """Fetches topic participants and the entry view (replies)."""
-    # The view endpoint for course-level and group-level discussions is usually consistent
-    url  = f"{API_URL}/courses/{course_id}/discussion_topics/{topic_id}/view"
-    resp = SESSION.get(url)  # [PERF] uses persistent session
-    if resp.status_code == 200:
-        data         = resp.json()
-        participants = {p["id"]: {
-                            "name" : p.get("display_name", "Unknown"),
-                            "email": p.get("email", "")
-                         } for p in data.get("participants", [])}
-        return participants, data.get("view", [])
+def get_discussion_topics(course_id):
+    """Get all discussion topics for a course."""
+    topics = []
+    url    = f"{API_URL}/courses/{course_id}/discussion_topics"
+    params = {"per_page": 50, "order_by": "recent_activity"}
+
+    while url:
+        try:
+            r = SESSION.get(url, params=params, timeout=20)
+            if r.status_code != 200:
+                break
+            topics.extend(r.json())
+            url = r.links.get("next", {}).get("url")
+            params = {}
+        except requests.exceptions.RequestException:
+            break
+
+    return topics
+
+
+def get_full_view(course_id, topic_id):
+    """Get full topic view including nested replies."""
+    url = f"{API_URL}/courses/{course_id}/discussion_topics/{topic_id}/view"
+    try:
+        r = SESSION.get(url, timeout=30)
+        if r.status_code == 200:
+            data = r.json()
+            participants = {p["id"]: p for p in data.get("participants", [])}
+            view = data.get("view", [])
+            return participants, view
+    except requests.exceptions.RequestException:
+        pass
     return {}, []
 
 
+def get_course_modules(course_id):
+    """Get all modules for a course."""
+    modules = []
+    url = f"{API_URL}/courses/{course_id}/modules"
+    params = {"per_page": 50}
+
+    while url:
+        try:
+            r = SESSION.get(url, params=params, timeout=20)
+            if r.status_code != 200:
+                break
+            modules.extend(r.json())
+            url = r.links.get("next", {}).get("url")
+            params = {}
+        except requests.exceptions.RequestException:
+            break
+
+    return modules
+
+
+def get_module_items(course_id, module_id):
+    """Get items in a module."""
+    items = []
+    url = f"{API_URL}/courses/{course_id}/modules/{module_id}/items"
+    params = {"per_page": 50}
+
+    while url:
+        try:
+            r = SESSION.get(url, params=params, timeout=20)
+            if r.status_code != 200:
+                break
+            items.extend(r.json())
+            url = r.links.get("next", {}).get("url")
+            params = {}
+        except requests.exceptions.RequestException:
+            break
+
+    return items
+
+
+def find_module_for_discussion(course_id, topic_id):
+    """Search modules to see which one contains this discussion topic."""
+    modules = get_course_modules(course_id)
+    for m in modules:
+        items = get_module_items(course_id, m["id"])
+        for item in items:
+            if item.get("type") == "Discussion" and item.get("content_id") == topic_id:
+                return m.get("name", "Unknown Module")
+    return None
+
+
 # ──────────────────────────────────────────────────────────────────
-#  DATE FORMATTERS
+#  DATE & FORMATTING HELPERS
 # ──────────────────────────────────────────────────────────────────
 
-def format_created_on(iso_str):
-    """Format ISO timestamp to: '4/8/25, 10:54 PM'."""
+def parse_iso(iso_str):
+    """Parse ISO datetime string to naive UTC datetime."""
     if not iso_str:
-        return ""
+        return None
     try:
-        dt = datetime.fromisoformat(iso_str.replace('Z', '+00:00'))
-        dt_local = dt.astimezone()
-        m = str(dt_local.month)
-        d = str(dt_local.day)
-        y = dt_local.strftime("%y")
-        hour_12 = dt_local.hour % 12
-        if hour_12 == 0:
-            hour_12 = 12
-        h = str(hour_12)
-        minute = dt_local.strftime("%M")
-        period = dt_local.strftime("%p")
-        return f"{m}/{d}/{y}, {h}:{minute} {period}"
+        s = iso_str.replace("Z", "+00:00")
+        dt = datetime.fromisoformat(s)
+        return dt.replace(tzinfo=None)
     except Exception:
-        return iso_str
-
-
-def format_replied_on(iso_str):
-    """Format ISO timestamp to: 'Apr 24, 2025 10:32 PM'."""
-    if not iso_str:
-        return ""
-    try:
-        dt = datetime.fromisoformat(iso_str.replace('Z', '+00:00'))
-        dt_local = dt.astimezone()
-        b = dt_local.strftime("%b")
-        d = str(dt_local.day)
-        year = dt_local.strftime("%Y")
-        hour_12 = dt_local.hour % 12
-        if hour_12 == 0:
-            hour_12 = 12
-        h = str(hour_12)
-        minute = dt_local.strftime("%M")
-        period = dt_local.strftime("%p")
-        return f"{b} {d}, {year} {h}:{minute} {period}"
-    except Exception:
-        return iso_str
+        return None
 
 
 def calculate_duration_hours(start_iso, end_iso):
-    """Returns difference in decimal hours."""
-    if not start_iso or not end_iso:
-        return None
-    try:
-        dt1 = datetime.fromisoformat(start_iso.replace('Z', '+00:00'))
-        dt2 = datetime.fromisoformat(end_iso.replace('Z', '+00:00'))
-        diff = dt2 - dt1
-        return round(diff.total_seconds() / 3600, 2)
-    except Exception:
-        return None
+    """Calculate duration between two timestamps in hours (1 decimal place)."""
+    start = parse_iso(start_iso)
+    end   = parse_iso(end_iso)
+    if start and end and end >= start:
+        return round((end - start).total_seconds() / 3600.0, 1)
+    return None
+
+
+def format_created_on(iso_str):
+    """Format: '4/8/25, 10:54 PM'"""
+    dt = parse_iso(iso_str)
+    if not dt:
+        return ""
+    hour = dt.hour % 12 or 12
+    am_pm = "AM" if dt.hour < 12 else "PM"
+    year_short = str(dt.year)[-2:]
+    return f"{dt.month}/{dt.day}/{year_short}, {hour}:{dt.minute:02d} {am_pm}"
+
+
+def format_replied_on(iso_str):
+    """Format: 'Apr 24, 2025 10:32 PM'"""
+    dt = parse_iso(iso_str)
+    if not dt:
+        return ""
+    months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+    month_str = months[dt.month - 1]
+    hour = dt.hour % 12 or 12
+    am_pm = "AM" if dt.hour < 12 else "PM"
+    return f"{month_str} {dt.day}, {dt.year} {hour}:{dt.minute:02d} {am_pm}"
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -315,18 +292,22 @@ def calculate_duration_hours(start_iso, end_iso):
 # ──────────────────────────────────────────────────────────────────
 
 def get_cohort_and_course(sis_id, course_name_api):
-    """Extract Cohort (e.g. UED5, UC5) and Course (e.g. EDU 817, BUS 910) from SIS ID or Course Name."""
-    # Cohort Extraction (Supports UED4, UED5, UC5, UC6 etc.)
-    cohort_match = re.search(r"(UED|UC)\d+", sis_id, re.IGNORECASE)
-    cohort       = cohort_match.group(0).upper() if cohort_match else "N/A"
+    """Extract Cohort (e.g. UC5, UC6, UB1, UED5) and Course (e.g. BUS 940, BUS 501) from SIS ID or Course Name."""
+    s_clean = str(sis_id).strip()
 
-    # Course Code Extraction (e.g. EDU 817, EDU 862)
-    course_match = re.search(r"^([a-zA-Z]+)[- ]?([0-9]+)", sis_id)
+    # Cohort Extraction (Supports UC5, UC6, UB1, UED10, etc.)
+    cohort_match = re.search(r"(UC|UB|UED)\s*(\d+)", s_clean, re.IGNORECASE)
+    if cohort_match:
+        cohort = f"{cohort_match.group(1).upper()}{cohort_match.group(2)}"
+    else:
+        cohort = "N/A"
+
+    # Course Code Extraction (e.g. BUS 940, BUS 501)
+    course_match = re.search(r"([a-zA-Z]{3})[- _]?([0-9]{3})", s_clean)
     if course_match:
         course_code = f"{course_match.group(1).upper()} {course_match.group(2)}"
     else:
-        # Fallback to cleaning the api course name
-        clean_match = re.search(r"^([a-zA-Z]+)\s*([0-9]+)", course_name_api)
+        clean_match = re.search(r"([a-zA-Z]{3})\s*([0-9]{3})", course_name_api)
         if clean_match:
             course_code = f"{clean_match.group(1).upper()} {clean_match.group(2)}"
         else:
@@ -337,166 +318,140 @@ def get_cohort_and_course(sis_id, course_name_api):
 
 def collect_consolidated_rows(course_id, sis_id, course_name_api):
     cohort, course_code = get_cohort_and_course(sis_id, course_name_api)
-    ta_emails_set = get_current_ta_emails()
 
-    # [PERF] Single API call extracts both user_map AND staff_ids — saves one full paginated request
+    # [PERF] Single API call extracts both user_map AND staff_ids
     user_map, staff_ids = get_course_users_with_emails(course_id)
 
     print("  Fetching modules...")
-    modules = paginated_get(f"{API_URL}/courses/{course_id}/modules")
-    print(f"    {len(modules)} module(s) found.")
+    modules = get_course_modules(course_id)
+    topic_module_map = {}
+
+    def fetch_items(m):
+        items = get_module_items(course_id, m["id"])
+        return m.get("name", "Unknown Module"), items
+
+    # Parallelize module fetching for speed
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        futures = [executor.submit(fetch_items, m) for m in modules]
+        for f in as_completed(futures):
+            mod_name, items = f.result()
+            for item in items:
+                if item.get("type") == "Discussion":
+                    topic_module_map[item.get("content_id")] = mod_name
 
     print("  Fetching discussion topics...")
-    all_topics   = paginated_get(f"{API_URL}/courses/{course_id}/discussion_topics")
-    topic_lookup = {t["id"]: t for t in all_topics}
-    print(f"    {len(all_topics)} discussion topic(s) found.\n")
-
-    # Group all discussion topics into a queue of (module_name, topic) tuples
-    # [FIX] Deduplicate topics across modules to avoid scraping the same topic multiple times
-    topics_queue = []
-    queued_topic_ids = set()
-    processed_topic_ids = set()
-
-    # [PERF] Fetch all module items in parallel using ThreadPoolExecutor
-    def _fetch_mod_items(mod):
-        mod_name = mod.get("name", f"Module {mod['id']}")
-        items = paginated_get(f"{API_URL}/courses/{course_id}/modules/{mod['id']}/items")
-        return mod_name, items
-
-    with ThreadPoolExecutor(max_workers=6) as executor:
-        futures = {executor.submit(_fetch_mod_items, m): m for m in modules}
-        for future in as_completed(futures):
-            mod_name, mod_items = future.result()
-            disc_topics = [
-                topic_lookup[item["content_id"]]
-                for item in mod_items
-                if item.get("type") == "Discussion"
-                and item.get("content_id") in topic_lookup
-            ]
-            for topic in disc_topics:
-                tid = topic["id"]
-                if tid not in queued_topic_ids:
-                    queued_topic_ids.add(tid)
-                    topics_queue.append((mod_name, topic))
-                processed_topic_ids.add(tid)
-
-    # Collect independent/orphan discussion topics that are not in any module
-    unprocessed_topics = [t for t in all_topics if t["id"] not in processed_topic_ids]
-    for topic in unprocessed_topics:
-        # Avoid processing Announcements (which Canvas treats as discussion topics with a flag)
-        if topic.get("type") == "Announcement" or topic.get("is_announcement"):
-            continue
-        if topic["id"] not in queued_topic_ids:
-            queued_topic_ids.add(topic["id"])
-            topics_queue.append(("General / Independent Discussions", topic))
-
+    topics = get_discussion_topics(course_id)
     flat_rows = []
-    seen_query_keys = set()
 
-    # Process each topic in our consolidated queue
-    for mod_name, topic in topics_queue:
-        topic_title = topic.get("title", "Untitled Discussion")
-        topic_id = topic["id"]
-        print(f"  Processing thread: [{mod_name}] >> {topic_title}")
-
-        # Resolve topic author
-        topic_author_id = topic.get("user_id") or (topic.get("author") or {}).get("id")
-        topic_author_info = user_map.get(topic_author_id, {}) if topic_author_id else {}
-        topic_author_name = topic_author_info.get("name") or (topic.get("author") or {}).get("display_name") or ""
-        topic_author_email = (topic_author_info.get("email") or "").strip().lower()
+    for topic in topics:
+        topic_title = topic.get("title", "Untitled Topic")
+        topic_module_name = topic_module_map.get(topic["id"])
 
         # Check if topic was created by a student/learner
+        topic_author = topic.get("user_name") or (topic.get("author") or {}).get("display_name")
+        topic_author_id = (topic.get("author") or {}).get("id") or topic.get("user_id")
+
+        topic_author_info = user_map.get(topic_author_id, {})
+        topic_author_name = topic_author_info.get("name") or topic_author or f"User#{topic_author_id}"
+        topic_author_email = (topic_author_info.get("email") or "").strip().lower()
+
         is_student_created = False
-        if topic_author_id:
-            if topic_author_id not in staff_ids and topic_author_email not in ta_emails_set:
-                is_student_created = True
+        if topic_author_id and topic_author_id not in staff_ids:
+            is_student_created = True
 
         participants, view = get_full_view(course_id, topic["id"])
 
-        # ────────────────────────────────────────────────────────
-        # GROUP DISCUSSION SUPPORT
-        # (In BUS courses, posts are often hidden inside Groups)
-        # ────────────────────────────────────────────────────────
-        if topic.get("group_category_id"):
-            # Search sub-groups and merge views
-            group_topics_url = f"{API_URL}/courses/{course_id}/discussion_topics/{topic['id']}/group_topics"
-            group_topics = paginated_get(group_topics_url)
-            for gt in group_topics:
-                processed_topic_ids.add(gt["id"])
-                _, g_view = get_full_view(course_id, gt["id"], is_group=True)
-                if g_view:
-                    view.extend(g_view)
-
         if is_student_created:
             # ────────────────────────────────────────────────────────
-            # MODE A: Student-created Discussion Topic (e.g., Assignment Due Dates)
+            # MODE A: Student-created Discussion Topic
             # ────────────────────────────────────────────────────────
-            # Skip invalid / empty student author
-            if not topic_author_name or topic_author_name.strip() in ("", "N/A", "Unknown", "User#None", "(No student posts yet)"):
-                continue
-
-            query_key = ("topic", topic_id)
-            if query_key in seen_query_keys:
-                continue
-            seen_query_keys.add(query_key)
-
             created_on = format_created_on(topic.get("created_at"))
 
-            ta_replies = []
+            # Evaluate replies for Mode A
+            assigned_info = sheets_helper.get_assigned_ta(course_code, topic_author_email, topic_author_info.get("student_id"))
+            all_ta_emails = sheets_helper.get_all_ta_emails()
+            assigned_ta_email = assigned_info["ta_email"].lower().strip() if (assigned_info and assigned_info.get("ta_email")) else None
+            assigned_ta_name = assigned_info["ta_name"].strip() if (assigned_info and assigned_info.get("ta_name")) else None
+
+            assigned_ta_replies = []
+            other_ta_replies = []
             all_replies = []
 
             for r in extract_all_replies(view):
                 rid      = r.get("user_id")
                 r_p_info = participants.get(rid, {})
                 r_u_info = user_map.get(rid, {})
-
-                r_name  = r_u_info.get("name") or r_p_info.get("name") or f"User#{rid}"
-                r_email = (r_u_info.get("email") or r_p_info.get("email") or "").strip().lower()
-                r_time  = r.get("created_at", "")
-
-                # TA Check: in live Google Sheet TA directory OR enrolled as staff in Canvas
-                is_ta = (r_email in ta_emails_set) or (rid in staff_ids)
+                r_name   = r_u_info.get("name") or r_p_info.get("display_name") or f"User#{rid}"
+                r_email  = (r_u_info.get("email") or r_p_info.get("email") or "").strip().lower()
+                r_time   = r.get("created_at", "")
 
                 reply_details = {
                     "name": r_name,
-                    "email": r_u_info.get("email") or r_p_info.get("email") or "",
+                    "email": r_email,
                     "time": r_time
                 }
 
-                if is_ta:
-                    ta_replies.append(reply_details)
+                if assigned_ta_email and r_email == assigned_ta_email:
+                    assigned_ta_replies.append(reply_details)
+                elif r_email in all_ta_emails:
+                    other_ta_replies.append(reply_details)
+                elif rid in staff_ids:
+                    other_ta_replies.append(reply_details)
                 all_replies.append(reply_details)
 
-            # Check SLA
             raw_created_on = topic.get("created_at")
-            raw_replied_on = None
-            first_responder = ""
-            if ta_replies:
-                sorted_ta = sorted(ta_replies, key=lambda x: x["time"])
-                raw_replied_on = sorted_ta[0]["time"]
-                first_responder = sorted_ta[0]["name"]
-                replied_on = format_replied_on(raw_replied_on)
-                replied = "Yes"
-            else:
-                replied = "No"
-                replied_on = ""
 
-            duration = calculate_duration_hours(raw_created_on, raw_replied_on)
-            if duration is not None:
-                sla_status = "Delayed Response" if duration > 24 else "On Time Response"
+            # Business Tracker SLA threshold is 24 hours
+            if assigned_info:
+                if assigned_ta_replies:
+                    sorted_rep = sorted(assigned_ta_replies, key=lambda x: x["time"])
+                    raw_replied_on = sorted_rep[0]["time"]
+                    first_responder = assigned_ta_name or sorted_rep[0]["name"]
+                    replied_on = format_replied_on(raw_replied_on)
+                    replied = "Yes"
+                    duration = calculate_duration_hours(raw_created_on, raw_replied_on)
+                    sla_status = "Delayed Response" if (duration is not None and duration > 24) else "On Time Response"
+                    rep_names_str = assigned_ta_name or sorted_rep[0]["name"]
+                    rep_emails_str = assigned_ta_email or sorted_rep[0]["email"]
+                elif other_ta_replies:
+                    sorted_rep = sorted(other_ta_replies, key=lambda x: x["time"])
+                    raw_replied_on = sorted_rep[0]["time"]
+                    other_name = sorted_rep[0]["name"]
+                    first_responder = f"{other_name} (Other TA)"
+                    replied_on = format_replied_on(raw_replied_on)
+                    replied = "Yes (Replied by another TA)"
+                    duration = calculate_duration_hours(raw_created_on, raw_replied_on)
+                    sla_status = "Delayed Response (Other TA)" if (duration is not None and duration > 24) else "On Time Response (Other TA)"
+                    rep_names_str = f"{other_name} (Other TA)"
+                    rep_emails_str = sorted_rep[0]["email"]
+                else:
+                    replied = "No"
+                    replied_on = ""
+                    duration = ""
+                    sla_status = "Pending Response"
+                    first_responder = ""
+                    rep_names_str = ""
+                    rep_emails_str = ""
             else:
-                sla_status = "SLA Not Applicable" if not is_student_created else "Pending Response"
-
-            # Gather all unique TA repliers for the entire thread
-            names = []
-            emails = []
-            for rep in ta_replies:
-                if rep["name"] not in names:
-                    names.append(rep["name"])
-                if rep["email"] and rep["email"] not in emails:
-                    emails.append(rep["email"])
-            rep_names_str  = ", ".join(names)
-            rep_emails_str = ", ".join(emails)
+                # No TA assigned to learner in ImportData_TA
+                if assigned_ta_replies or other_ta_replies:
+                    sorted_rep = sorted(assigned_ta_replies or other_ta_replies, key=lambda x: x["time"])
+                    raw_replied_on = sorted_rep[0]["time"]
+                    first_responder = f"{sorted_rep[0]['name']} (Unassigned)"
+                    replied_on = format_replied_on(raw_replied_on)
+                    replied = "Yes (No TA Assigned)"
+                    duration = calculate_duration_hours(raw_created_on, raw_replied_on)
+                    sla_status = "Delayed Response" if (duration is not None and duration > 24) else "On Time Response"
+                    rep_names_str = sorted_rep[0]["name"]
+                    rep_emails_str = sorted_rep[0]["email"]
+                else:
+                    replied = "No (No TA Assigned)"
+                    replied_on = ""
+                    duration = ""
+                    sla_status = "Pending (No TA Assigned)"
+                    first_responder = "Unassigned"
+                    rep_names_str = ""
+                    rep_emails_str = ""
 
             flat_rows.append({
                 "Cohort"            : cohort,
@@ -511,54 +466,42 @@ def collect_consolidated_rows(course_id, sis_id, course_name_api):
                 "Duration (Hours)"  : duration if duration is not None else "",
                 "SLA Status"        : sla_status,
                 "First Responder"   : first_responder,
-                "Replied By (Name)" : rep_names_str,
-                "Replied By (Email)": rep_emails_str
+                "Assigned TA (Needs to Reply)" : assigned_ta_name or "Unassigned",
+                "Assigned TA Email": assigned_ta_email or ""
             })
 
         else:
             # ────────────────────────────────────────────────────────
-            # MODE B: Instructor/Staff-created Discussion Topic (e.g., Generative AI Playground)
+            # MODE B: Instructor/Staff-created Discussion Topic
             # ────────────────────────────────────────────────────────
-            # The top-level entries inside 'view' are student queries.
-            # [FIX] Do NOT add artificial (No student posts yet) dummy rows if not view!
             if not view:
                 continue
 
             for entry in view:
-                # [FIX] Skip deleted Canvas posts and empty placeholders
-                if entry.get("deleted") or (entry.get("message") is None and not entry.get("replies")):
+                uid = entry.get("user_id")
+
+                # Filter out instructor/staff top-level posts
+                if uid in staff_ids:
                     continue
 
-                author_id = entry.get("user_id")
-                p_info = participants.get(author_id, {})
-                u_info = user_map.get(author_id, {})
-
-                l_name  = u_info.get("name") or p_info.get("name")
-                l_email = (u_info.get("email") or p_info.get("email") or "").strip().lower()
-                l_sid   = u_info.get("student_id", "N/A")
-
-                # IMPORTANT: Skip if no author or entry itself was posted by staff (by ID or Email)
-                if not author_id or author_id in staff_ids or l_email in ta_emails_set:
-                    continue
-
-                # [FIX] Skip invalid / placeholder learner records
-                if not l_name or l_name.strip() in ("", "N/A", "Unknown", "User#None", "(No student posts yet)"):
-                    continue
-
-                # [FIX] Deduplicate on distinct query entry ID.
-                # If a learner raises TWO distinct queries in the same module/topic, each has a distinct entry ID and is preserved!
-                entry_id = entry.get("id")
-                query_key = ("entry", entry_id) if entry_id else ("entry_fallback", topic_id, author_id, entry.get("created_at"))
-                if query_key in seen_query_keys:
-                    continue
-                seen_query_keys.add(query_key)
+                u_info = user_map.get(uid, {})
+                l_name = u_info.get("name") or f"User#{uid}"
+                l_email = (u_info.get("email") or "").strip().lower()
+                l_sid = u_info.get("student_id", "N/A")
 
                 raw_created = entry.get("created_at")
-                created_on  = format_created_on(raw_created)
+                created_on = format_created_on(raw_created)
 
-                # Check replies to this student post (including nested threaded replies)
+                # Recursive extraction captures all nested threaded replies
                 raw_replies = extract_all_replies(entry.get("replies", []))
-                ta_replies = []
+
+                assigned_info = sheets_helper.get_assigned_ta(course_code, l_email, l_sid)
+                all_ta_emails = sheets_helper.get_all_ta_emails()
+                assigned_ta_email = assigned_info["ta_email"].lower().strip() if (assigned_info and assigned_info.get("ta_email")) else None
+                assigned_ta_name = assigned_info["ta_name"].strip() if (assigned_info and assigned_info.get("ta_name")) else None
+
+                assigned_ta_replies = []
+                other_ta_replies = []
                 all_replies = []
 
                 for rp in raw_replies:
@@ -567,40 +510,65 @@ def collect_consolidated_rows(course_id, sis_id, course_name_api):
                     rp_name = ru_info.get("name") or f"User#{rid}"
                     rp_email = (ru_info.get("email") or "").strip().lower()
 
-                    # TA Check: in live Google Sheet TA directory OR enrolled as staff in Canvas
-                    is_ta = (rp_email in ta_emails_set) or (rid in staff_ids)
                     rep_det = {"name": rp_name, "email": rp_email, "time": rp.get("created_at")}
-                    if is_ta: ta_replies.append(rep_det)
+                    if assigned_ta_email and rp_email == assigned_ta_email:
+                        assigned_ta_replies.append(rep_det)
+                    elif rp_email in all_ta_emails:
+                        other_ta_replies.append(rep_det)
+                    elif rid in staff_ids:
+                        other_ta_replies.append(rep_det)
                     all_replies.append(rep_det)
 
-                raw_replied = None
-                first_responder = ""
-                if ta_replies:
-                    sorted_ta = sorted(ta_replies, key=lambda x: x["time"])
-                    raw_replied = sorted_ta[0]["time"]
-                    first_responder = sorted_ta[0]["name"]
-                    replied_on = format_replied_on(raw_replied)
-                    replied = "Yes"
+                # Business Tracker SLA threshold is 24 hours
+                if assigned_info:
+                    if assigned_ta_replies:
+                        sorted_rep = sorted(assigned_ta_replies, key=lambda x: x["time"])
+                        raw_replied = sorted_rep[0]["time"]
+                        first_responder = assigned_ta_name or sorted_rep[0]["name"]
+                        replied_on = format_replied_on(raw_replied)
+                        replied = "Yes"
+                        duration = calculate_duration_hours(raw_created, raw_replied)
+                        sla_status = "Delayed Response" if (duration is not None and duration > 24) else "On Time Response"
+                        rep_names_str = assigned_ta_name or sorted_rep[0]["name"]
+                        rep_emails_str = assigned_ta_email or sorted_rep[0]["email"]
+                    elif other_ta_replies:
+                        sorted_rep = sorted(other_ta_replies, key=lambda x: x["time"])
+                        raw_replied = sorted_rep[0]["time"]
+                        other_name = sorted_rep[0]["name"]
+                        first_responder = f"{other_name} (Other TA)"
+                        replied_on = format_replied_on(raw_replied)
+                        replied = "Yes (Replied by another TA)"
+                        duration = calculate_duration_hours(raw_created, raw_replied)
+                        sla_status = "Delayed Response (Other TA)" if (duration is not None and duration > 24) else "On Time Response (Other TA)"
+                        rep_names_str = f"{other_name} (Other TA)"
+                        rep_emails_str = sorted_rep[0]["email"]
+                    else:
+                        replied = "No"
+                        replied_on = ""
+                        duration = ""
+                        sla_status = "Pending Response"
+                        first_responder = ""
+                        rep_names_str = ""
+                        rep_emails_str = ""
                 else:
-                    replied = "No"
-                    replied_on = ""
-
-                duration = calculate_duration_hours(raw_created, raw_replied)
-                if duration is not None:
-                    sla_status = "Delayed Response" if duration > 24 else "On Time Response"
-                else:
-                    sla_status = "Pending Response"
-
-                # Gather all unique TA repliers for the student post
-                names = []
-                emails = []
-                for rep in ta_replies:
-                    if rep["name"] not in names:
-                        names.append(rep["name"])
-                    if rep["email"] and rep["email"] not in emails:
-                        emails.append(rep["email"])
-                rep_names_str  = ", ".join(names)
-                rep_emails_str = ", ".join(emails)
+                    if assigned_ta_replies or other_ta_replies:
+                        sorted_rep = sorted(assigned_ta_replies or other_ta_replies, key=lambda x: x["time"])
+                        raw_replied = sorted_rep[0]["time"]
+                        first_responder = f"{sorted_rep[0]['name']} (Unassigned)"
+                        replied_on = format_replied_on(raw_replied)
+                        replied = "Yes (No TA Assigned)"
+                        duration = calculate_duration_hours(raw_created, raw_replied)
+                        sla_status = "Delayed Response" if (duration is not None and duration > 24) else "On Time Response"
+                        rep_names_str = sorted_rep[0]["name"]
+                        rep_emails_str = sorted_rep[0]["email"]
+                    else:
+                        replied = "No (No TA Assigned)"
+                        replied_on = ""
+                        duration = ""
+                        sla_status = "Pending (No TA Assigned)"
+                        first_responder = "Unassigned"
+                        rep_names_str = ""
+                        rep_emails_str = ""
 
                 flat_rows.append({
                     "Cohort"            : cohort,
@@ -615,11 +583,12 @@ def collect_consolidated_rows(course_id, sis_id, course_name_api):
                     "Duration (Hours)"  : duration if duration is not None else "",
                     "SLA Status"        : sla_status,
                     "First Responder"   : first_responder,
-                    "Replied By (Name)" : rep_names_str,
-                    "Replied By (Email)": rep_emails_str
+                    "Assigned TA (Needs to Reply)" : assigned_ta_name or "Unassigned",
+                    "Assigned TA Email": assigned_ta_email or ""
                 })
 
     return flat_rows
+
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -636,15 +605,12 @@ C_NO_FG    = "C00000"
 C_ALT_BG   = "F9FBFD"   # very light blue alternate
 C_BORDER   = "D9D9D9"
 
-# [PERF] Pre-create reusable style objects once at module level
-# Avoids creating thousands of identical Font/PatternFill/Border objects per sheet
 _SIDE           = Side(border_style="thin", color=C_BORDER)
 CACHED_BORDER   = Border(left=_SIDE, right=_SIDE, top=_SIDE, bottom=_SIDE)
 CACHED_HDR_FONT = Font(bold=True, color=C_HDR_FG, size=10)
 CACHED_HDR_FILL = PatternFill("solid", fgColor=C_HDR_BG)
 CACHED_HDR_ALIGN = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
-# [PERF] Cache per-style fill/font combos used repeatedly in data rows
 _FILL_CACHE = {}
 _FONT_CACHE = {}
 _ALIGN_CACHE = {}
@@ -666,15 +632,14 @@ def _get_align(horizontal, vertical="center", wrap=True):
         _ALIGN_CACHE[key] = Alignment(horizontal=horizontal, vertical=vertical, wrap_text=wrap)
     return _ALIGN_CACHE[key]
 
-
 def thin_border():
-    return CACHED_BORDER  # [PERF] Return cached singleton
+    return CACHED_BORDER
 
 
 def build_excel_sheet(wb, flat_rows, sis_id, course_name):
     # Sanitize sheet title (Excel doesn't allow: : \ / ? * [ ])
     clean_title = re.sub(r'[:\\\/\?\*\[\]]', '_', sis_id)
-    safe_title = clean_title[:31] # Max 31 chars
+    safe_title = clean_title[:31]
 
     if "Sheet" in wb.sheetnames and len(wb.sheetnames) == 1 and wb.active.title == "Sheet":
         ws = wb.active
@@ -691,49 +656,143 @@ def build_excel_sheet(wb, flat_rows, sis_id, course_name):
     t.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[1].height = 28
 
-    # ── Column Headers ─────────────────────────────────────────────
+    # ── Summary Analysis Table (ABOVE LEARNER DETAILS TABLE) ─────────
+    valid_rows = [r for r in flat_rows if r.get("Learner Name") and r["Learner Name"] not in ("(No student posts yet)", "N/A", "Unknown", "User#None")]
+    unique_learners = len(set(r["Learner Name"] for r in valid_rows))
+    total_queries   = len(valid_rows)
+    total_replied   = len([r for r in valid_rows if str(r.get("Replied", "")).startswith("Yes") or "replied" in str(r.get("Replied", "")).lower()])
+    pending_queries = len([r for r in valid_rows if str(r.get("Replied", "")).startswith("No")])
+    durations       = [r["Duration (Hours)"] for r in valid_rows if isinstance(r.get("Duration (Hours)"), (int, float))]
+    avg_course_time = round(sum(durations)/len(durations), 2) if durations else 0
+
+    within_sla  = len([r for r in valid_rows if "On Time" in str(r.get("SLA Status", ""))])
+    outside_sla = len([r for r in valid_rows if "Delayed" in str(r.get("SLA Status", ""))])
+
+    # Pending queries average elapsed duration (hours)
+    now_dt = datetime.now()
+    pending_durs = []
+    for r in valid_rows:
+        if str(r.get("Replied", "")).startswith("No"):
+            created_dt = sheets_helper.parse_date_string(r.get("Created On"))
+            if created_dt:
+                p_hrs = max(0.0, round((now_dt - created_dt).total_seconds() / 3600.0, 1))
+                pending_durs.append(p_hrs)
+    avg_pending_time = round(sum(pending_durs)/len(pending_durs), 2) if pending_durs else 0
+
+    # TA Breakdown Calculation
+    ta_stats = {}
+    for r in valid_rows:
+        assigned_ta = (r.get("Assigned TA (Needs to Reply)") or "").strip()
+        first_resp  = (r.get("First Responder") or "").strip()
+        sla_st      = str(r.get("SLA Status", "")).strip()
+        rep_val     = str(r.get("Replied", "")).strip()
+        dur_val     = r.get("Duration (Hours)")
+
+        primary_ta = assigned_ta if (assigned_ta and assigned_ta != "Unassigned") else (first_resp or "Unassigned")
+        if primary_ta not in ta_stats:
+            ta_stats[primary_ta] = {"pending": 0, "replies": 0, "ontime": 0, "delayed": 0, "durs": []}
+
+        if rep_val.startswith("No") or "Pending" in sla_st:
+            ta_stats[primary_ta]["pending"] += 1
+        else:
+            resp_key = first_resp if first_resp else primary_ta
+            if resp_key not in ta_stats:
+                ta_stats[resp_key] = {"pending": 0, "replies": 0, "ontime": 0, "delayed": 0, "durs": []}
+            ta_stats[resp_key]["replies"] += 1
+            if "On Time" in sla_st:
+                ta_stats[resp_key]["ontime"] += 1
+            if "Delayed" in sla_st:
+                ta_stats[resp_key]["delayed"] += 1
+            if isinstance(dur_val, (int, float)):
+                ta_stats[resp_key]["durs"].append(dur_val)
+
+    # Table 1: Course Overview (Rows 3 to 6)
+    sum_start = 3
+    ws.merge_cells(f"A{sum_start}:F{sum_start}")
+    sh1 = ws[f"A{sum_start}"]; sh1.value = "COURSE OVERVIEW"; sh1.font = Font(bold=True, color="FFFFFF"); sh1.fill = PatternFill("solid", fgColor="4472C4"); sh1.alignment = Alignment(horizontal="center")
+    for col in range(1, 7): ws.cell(row=sum_start, column=col).border = thin_border()
+
+    # Category Headers
+    c_tp = ws.cell(row=sum_start+1, column=1, value="Total Post"); c_tp.font = Font(bold=True, color="FFFFFF"); c_tp.fill = PatternFill("solid", fgColor="1F3864"); c_tp.alignment = Alignment(horizontal="center"); c_tp.border = thin_border()
+    ws.merge_cells(f"B{sum_start+1}:D{sum_start+1}")
+    c_tr = ws.cell(row=sum_start+1, column=2, value="Total Response"); c_tr.font = Font(bold=True, color="375623"); c_tr.fill = PatternFill("solid", fgColor="E2EFDA"); c_tr.alignment = Alignment(horizontal="center")
+    for col in range(2, 5): ws.cell(row=sum_start+1, column=col).border = thin_border()
+    ws.merge_cells(f"E{sum_start+1}:F{sum_start+1}")
+    c_pr = ws.cell(row=sum_start+1, column=5, value="Pending Response"); c_pr.font = Font(bold=True, color="C00000"); c_pr.fill = PatternFill("solid", fgColor="FCE4D6"); c_pr.alignment = Alignment(horizontal="center")
+    for col in range(5, 7): ws.cell(row=sum_start+1, column=col).border = thin_border()
+
+    # Sub-Headers
+    sub_hdrs = ["Total Queries", "Within SLA", "Outside SLA", "Avg. Response HR", "Pending Count", "Avg"]
+    for ci, h in enumerate(sub_hdrs, start=1):
+        sc = ws.cell(row=sum_start+2, column=ci, value=h)
+        sc.font = Font(bold=True, size=9); sc.fill = PatternFill("solid", fgColor="F2F2F2"); sc.alignment = Alignment(horizontal="center"); sc.border = thin_border()
+
+    # Data Values
+    data_vals = [total_queries, within_sla, outside_sla, avg_course_time, pending_queries, avg_pending_time]
+    for ci, val in enumerate(data_vals, start=1):
+        dc = ws.cell(row=sum_start+3, column=ci, value=val)
+        dc.font = Font(bold=(ci==1 or ci==5)); dc.alignment = Alignment(horizontal="center"); dc.border = thin_border()
+
+    # Row 7 is a spacer row
+    ws.row_dimensions[7].height = 12
+
+    # ── Column Headers for Learner Details Table (Row 8) ───────────
+    hdr_row = 8
     headers = [
         "Cohort", "Course Name", "Topic", "Learner Name", "Student ID", "Learner Email", 
         "Created On", "Replied", "Replied On", "Duration (Hours)", "SLA Status", 
-        "First Responder", "Replied By (Name)", "Replied By (Email)"
+        "First Responder", "Assigned TA (Needs to Reply)", "Assigned TA Email"
     ]
-    col_widths = [10, 15, 30, 20, 15, 25, 18, 10, 20, 15, 18, 20, 25, 30]
+    col_widths = [10, 15, 30, 20, 15, 25, 18, 10, 20, 15, 18, 20, 28, 30]
 
     for ci, (h, w) in enumerate(zip(headers, col_widths), start=1):
-        cell           = ws.cell(row=2, column=ci, value=h)
-        cell.font      = CACHED_HDR_FONT   # [PERF] reuse cached style
+        cell           = ws.cell(row=hdr_row, column=ci, value=h)
+        cell.font      = CACHED_HDR_FONT
         cell.fill      = CACHED_HDR_FILL
         cell.alignment = CACHED_HDR_ALIGN
         cell.border    = CACHED_BORDER
         ws.column_dimensions[get_column_letter(ci)].width = w
 
-    ws.row_dimensions[2].height = 24
+    ws.row_dimensions[hdr_row].height = 24
 
-    # ── Data Row Injection ─────────────────────────────────────────
+    # ── Data Row Injection (Row 9+) ────────────────────────────────
     if not flat_rows:
-        ws.merge_cells("A3:N3")
-        empty = ws["A3"]
+        ws.merge_cells("A9:N9")
+        empty = ws["A9"]
         empty.value     = "No discussion boards or learner posts found in this course."
         empty.font      = Font(italic=True, color="808080")
         empty.alignment = Alignment(horizontal="center", vertical="center")
-        ws.row_dimensions[3].height = 24
-        last_row = 3
+        ws.row_dimensions[9].height = 24
+        last_row = 9
     else:
-        for ri, r in enumerate(flat_rows, start=3):
-            is_yes   = r["Replied"] == "Yes"
-            is_no    = r["Replied"] == "No"
-            is_delayed = r["SLA Status"] == "Delayed Response"
-            alt_bg   = C_ALT_BG if ri % 2 == 0 else "FFFFFF"
+        for ri, r in enumerate(flat_rows, start=9):
+            val_replied = str(r.get("Replied", "")).strip()
+            val_sla     = str(r.get("SLA Status", "")).strip()
+            is_yes      = val_replied == "Yes"
+            is_no       = val_replied.startswith("No")
+            is_other    = "Other TA" in val_replied or "Replied by another TA" in val_replied
+            is_delayed  = "Delayed" in val_sla
+            is_ontime   = "On Time" in val_sla
+            alt_bg      = C_ALT_BG if ri % 2 == 0 else "FFFFFF"
 
-            # Dynamic styling
-            replied_bg = C_YES_BG if is_yes else (C_NO_BG if is_no else alt_bg)
-            replied_fg = C_YES_FG if is_yes else (C_NO_FG if is_no else "7F8C8D")
+            if is_other:
+                replied_bg = "FFF2CC"
+                replied_fg = "7F6000"
+            elif is_yes:
+                replied_bg = C_YES_BG
+                replied_fg = C_YES_FG
+            elif is_no:
+                replied_bg = C_NO_BG
+                replied_fg = C_NO_FG
+            else:
+                replied_bg = alt_bg
+                replied_fg = "7F8C8D"
 
             sla_bg = alt_bg
             sla_fg = "000000"
             if is_delayed:
                 sla_bg = "FFC7CE"; sla_fg = "9C0006"
-            elif r["SLA Status"] == "On Time Response":
+            elif is_ontime:
                 sla_bg = "C6EFCE"; sla_fg = "006100"
 
             row_cells = [
@@ -749,74 +808,27 @@ def build_excel_sheet(wb, flat_rows, sis_id, course_name):
                 (r["Duration (Hours)"],   "center", alt_bg, "000000", False),
                 (r["SLA Status"],         "center", sla_bg, sla_fg, True),
                 (r["First Responder"],    "left",   alt_bg, "000000", True),
-                (r["Replied By (Name)"],  "left",   alt_bg, "000000", False),
-                (r["Replied By (Email)"], "left",   alt_bg, "000000", False)
+                (r.get("Assigned TA (Needs to Reply)", r.get("Replied By (Name)", "")),  "left",   alt_bg, "000000", False),
+                (r.get("Assigned TA Email", r.get("Replied By (Email)", "")), "left",   alt_bg, "000000", False)
             ]
 
             for ci, (val, align, bg, fg, bold) in enumerate(row_cells, start=1):
                 cell           = ws.cell(row=ri, column=ci, value=val)
-                cell.font      = _get_font(bold, fg)     # [PERF] cached font
-                cell.fill      = _get_fill(bg)            # [PERF] cached fill
-                cell.alignment = _get_align(align)         # [PERF] cached alignment
-                cell.border    = CACHED_BORDER             # [PERF] cached border
+                cell.font      = _get_font(bold, fg)
+                cell.fill      = _get_fill(bg)
+                cell.alignment = _get_align(align)
+                cell.border    = CACHED_BORDER
+
             ws.row_dimensions[ri].height = 20
             last_row = ri
 
-    # ── Summary Analysis Table ─────────────────────────────────────
-    sum_start = last_row + 3
-    
-    # Calculate Metrics - filter for valid learner rows to guarantee exact consistency
-    valid_rows = [
-        r for r in flat_rows 
-        if r.get("Learner Name") and r.get("Learner Name") not in ("(No student posts yet)", "N/A", "Unknown", "User#None", "")
-    ]
-    unique_learners = len(set(r["Learner Name"] for r in valid_rows))
-    total_queries   = len(valid_rows)
-    total_replied   = len([r for r in valid_rows if r.get("Replied") == "Yes"])
-    pending_queries = len([r for r in valid_rows if r.get("Replied") == "No"])
-    durations       = [r["Duration (Hours)"] for r in valid_rows if isinstance(r.get("Duration (Hours)"), (int, float))]
-    avg_course_time = round(sum(durations)/len(durations), 2) if durations else 0
-
-    # TA Breakdown Calculation
-    ta_stats = {}
-    for r in flat_rows:
-        ta_name = r.get("First Responder")
-        if not ta_name: continue
-        if ta_name not in ta_stats:
-            ta_stats[ta_name] = {"replies": 0, "ontime": 0, "delayed": 0, "durs": []}
-        
-        ta_stats[ta_name]["replies"] += 1
-        if r["SLA Status"] == "On Time Response": ta_stats[ta_name]["ontime"] += 1
-        if r["SLA Status"] == "Delayed Response": ta_stats[ta_name]["delayed"] += 1
-        if isinstance(r["Duration (Hours)"], (int, float)):
-            ta_stats[ta_name]["durs"].append(r["Duration (Hours)"])
-
-    # Table 1: Course Overview
-    ws.merge_cells(f"A{sum_start}:D{sum_start}")
-    sh1 = ws[f"A{sum_start}"]; sh1.value = "COURSE OVERVIEW"; sh1.font = Font(bold=True, color="FFFFFF"); sh1.fill = PatternFill("solid", fgColor="4472C4"); sh1.alignment = Alignment(horizontal="center")
-    sh1.border = thin_border()
-    
-    overview = [
-        ("Total Unique Learners", unique_learners),
-        ("Total Queries Found", total_queries),
-        ("Total Replied (TAs)", total_replied),
-        ("Pending Queries", pending_queries),
-        ("Avg Course Response Time (Hrs)", avg_course_time)
-    ]
-    for i, (lab, val) in enumerate(overview, start=1):
-        c1 = ws.cell(row=sum_start+i, column=1, value=lab); c1.font = Font(bold=True); c1.border = thin_border()
-        c2 = ws.cell(row=sum_start+i, column=2, value=val); c2.alignment = Alignment(horizontal="center"); c2.border = thin_border()
-        ws.merge_cells(f"B{sum_start+i}:D{sum_start+i}")
-        # Apply border to merged cells
-        for col in range(2, 5): ws.cell(row=sum_start+i, column=col).border = thin_border()
-
-    # Table 2: TA Performance Breakdown
-    ta_start = sum_start + 7
+    # ── Table 2: TA Performance Breakdown (below learner rows) ─────
+    ta_start = last_row + 2
     ws.merge_cells(f"A{ta_start}:G{ta_start}")
     sh2 = ws[f"A{ta_start}"]; sh2.value = "TA PERFORMANCE BREAKDOWN (TREND ANALYSIS)"; sh2.font = Font(bold=True, color="FFFFFF"); sh2.fill = PatternFill("solid", fgColor="C00000"); sh2.alignment = Alignment(horizontal="center")
-    sh2.border = thin_border()
+    for col in range(1, 8): ws.cell(row=ta_start, column=col).border = thin_border()
     
-    ta_hdrs = ["TA Name", "Replies", "On-Time", "Delayed", "Avg Time (Hrs)", "SLA Violation %"]
+    ta_hdrs = ["TA Name", "Pending Response", "Replies", "On-Time", "Delayed", "Avg Time (Hrs)", "SLA Violation %"]
     for ci, h in enumerate(ta_hdrs, start=1):
         c = ws.cell(row=ta_start+1, column=ci, value=h)
         c.font = Font(bold=True); c.fill = PatternFill("solid", fgColor="D9D9D9"); c.alignment = Alignment(horizontal="center"); c.border = thin_border()
@@ -827,6 +839,7 @@ def build_excel_sheet(wb, flat_rows, sis_id, course_name):
         
         cells = [
             (name, "left"),
+            (s["pending"], "center"),
             (s["replies"], "center"),
             (s["ontime"], "center"),
             (s["delayed"], "center"),
@@ -837,7 +850,7 @@ def build_excel_sheet(wb, flat_rows, sis_id, course_name):
             c = ws.cell(row=ta_start+i, column=ci, value=v)
             c.alignment = Alignment(horizontal=a); c.border = thin_border()
 
-    ws.freeze_panes = "A3"
+    ws.freeze_panes = "A9"
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -856,18 +869,16 @@ def main():
         raw_input = " ".join(sys.argv[1:])
     else:
         print("\n  Enter Course SIS IDs (separated by space or comma):")
-        print("  Example: EDU-862-UED4--Spring-2026, EDU-817-UED5--Spring-2026")
+        print("  Example: BUS-940-UC6--Fall-2026, BUS-902-UC7--Fall-2026")
         raw_input = input("\n  > ").strip()
 
     if not raw_input:
         print("  [!] No SIS ID entered. Exiting.")
         sys.exit(1)
 
-    # Prioritize comma splitting to allow spaces within a single SIS ID (e.g. "Spring 2026")
     if "," in raw_input:
         sis_ids = [s.strip() for s in raw_input.split(",") if s.strip()]
     else:
-        # Fallback to whitespace splitting only if no commas are present
         sis_ids = [s.strip() for s in raw_input.split() if s.strip()]
     
     if not sis_ids:
@@ -890,17 +901,13 @@ def main():
         course_name = course.get("name", "Unknown Course")
         print(f"  Found --> [{course_id}] {course_name}")
 
-        # Collect data
         flat_rows = collect_consolidated_rows(course_id, sis_id, course_name)
-
-        # Check if we have any actual learner queries (not just placeholders)
         has_real_data = any(r.get("Learner Name") not in ("(No student posts yet)", "N/A", "Unknown", "User#None", "") for r in flat_rows)
 
         if not flat_rows or not has_real_data:
             print(f"  [!] No student discussions found in this course. Skipping tab.")
             continue
 
-        # Build sheet in shared workbook
         build_excel_sheet(wb, flat_rows, sis_id, course_name)
         processed_count += 1
 
@@ -908,10 +915,7 @@ def main():
         print("\n  [!] No courses were successfully processed. Excel not saved.")
         sys.exit(1)
 
-    # Final Save
     timestamp = datetime.now().strftime('%Y%m%d_%H%M')
-    # Use first SIS ID in filename for reference
-    ref_id = sis_ids[0].replace(" ", "_")
     fname = os.path.join(SCRIPT_DIR, f"MultiCourse_Discussion_Audit_{timestamp}.xlsx")
     
     wb.save(fname)

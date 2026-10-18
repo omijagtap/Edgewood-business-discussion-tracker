@@ -105,17 +105,38 @@
                 <span class="text-xl font-thin text-white/60 tracking-wide ml-2">Automation</span>
             </div>
 
-            <!-- Tab Switcher Navigation (matching user image layout) -->
-            <div
-                class="flex bg-[rgba(0,0,0,0.4)] border border-[rgba(255,255,255,0.08)] rounded-full p-1 shadow-inner backdrop-blur-md">
-                <button id="nav-audit"
-                    class="px-5 py-2 text-xs font-semibold text-white bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.05)] rounded-full transition-all shadow-sm focus:outline-none">
-                    Audit Canvas
-                </button>
-                <button id="nav-dashboard"
-                    class="px-5 py-2 text-xs font-semibold text-white/50 hover:text-white rounded-full transition-all focus:outline-none ml-1">
-                    Dashboard
-                </button>
+            <div class="flex items-center gap-3">
+                <!-- Tab Switcher Navigation -->
+                <div
+                    class="flex bg-[rgba(0,0,0,0.4)] border border-[rgba(255,255,255,0.08)] rounded-full p-1 shadow-inner backdrop-blur-md">
+                    <button id="nav-audit"
+                        class="px-5 py-2 text-xs font-semibold text-white bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.05)] rounded-full transition-all shadow-sm focus:outline-none">
+                        Audit Canvas
+                    </button>
+                    <button id="nav-dashboard"
+                        class="px-5 py-2 text-xs font-semibold text-white/50 hover:text-white rounded-full transition-all focus:outline-none ml-1">
+                        Dashboard
+                    </button>
+                </div>
+
+                <!-- Action Buttons: Send Email to TAs + Settings -->
+                <div class="flex items-center gap-2">
+                    <button id="nav-btn-email-tas"
+                        class="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white/80 hover:text-white bg-[rgba(238,44,60,0.12)] hover:bg-[rgba(238,44,60,0.25)] border border-[#EE2C3C]/30 hover:border-[#EE2C3C]/60 rounded-full transition-all shadow-sm focus:outline-none">
+                        <svg class="w-3.5 h-3.5 text-[#EE2C3C]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                        </svg>
+                        <span>Send Email to TAs</span>
+                    </button>
+                    <button id="nav-btn-settings"
+                        class="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white/70 hover:text-white bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.12)] border border-[rgba(255,255,255,0.08)] rounded-full transition-all shadow-sm focus:outline-none">
+                        <svg class="w-3.5 h-3.5 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                        <span>Settings</span>
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -139,7 +160,7 @@
                         Edgewood Business <br />Discussion Tracker</h1>
 
                     <p class="text-[rgba(255,255,255,0.6)] text-sm mb-8 leading-relaxed font-light">
-                        Automate your Business discussion forum audits. Instead of manually searching Canvas to find out
+                        Automate your Education discussion forum audits. Instead of manually searching Canvas to find out
                         which learner has raised a query and whether a TA has replied, this tool pulls all the activity
                         instantly.
                     </p>
@@ -168,8 +189,20 @@
                             <div
                                 class="bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.15)] group-hover:bg-[rgba(238,44,60,0.1)] group-hover:border-[#EE2C3C] text-white/90 w-7 h-7 rounded-full flex items-center justify-center font-medium shadow-sm flex-shrink-0 mt-0.5 transition-all">
                                 3</div>
-                            <div class="pt-1"><strong class="silver-shimmer font-medium text-[13px]">Analyze
-                                    SLAs:</strong> Checks if the reply was within the time frame.</div>
+                            <div class="pt-1">
+                                <strong class="silver-shimmer font-medium text-[13px]">Analyze SLAs:</strong> 
+                                Evaluates responses against targeted thresholds:
+                                <div class="mt-2.5 flex flex-wrap gap-2">
+                                    <span class="px-2.5 py-1 bg-white/[0.03] border border-white/[0.08] text-[10px] text-white/60 rounded-xl font-mono flex items-center gap-1.5 shadow-sm group-hover:border-emerald-500/20 group-hover:bg-emerald-500/5 transition-all">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                        <strong class="text-emerald-400 font-semibold">48h SLA:</strong> General / Raise Your Hand
+                                    </span>
+                                    <span class="px-2.5 py-1 bg-white/[0.03] border border-white/[0.08] text-[10px] text-white/60 rounded-xl font-mono flex items-center gap-1.5 shadow-sm group-hover:border-blue-500/20 group-hover:bg-blue-500/5 transition-all">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                                        <strong class="text-blue-400 font-semibold">72h SLA:</strong> Specific Topics
+                                    </span>
+                                </div>
+                            </div>
                         </li>
                     </ul>
                 </div>
@@ -193,7 +226,7 @@
                                 Course Code(s)
                             </label>
                             <input type="text" id="course_codes" name="course_codes"
-                                placeholder="e.g. BUS-910-UC5--Spring-2026" required
+                                placeholder="e.g. BUS-940-UC6--Fall-2026" required
                                 class="input-glow w-full bg-[rgba(0,0,0,0.3)] border border-[rgba(255,255,255,0.12)] text-white text-left text-sm rounded-xl px-5 py-4 focus:outline-none transition-all shadow-inner placeholder-[rgba(255,255,255,0.15)] backdrop-blur-sm" />
                             <div
                                 class="mt-4 p-4 rounded-xl bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.04)] backdrop-blur-sm text-left hover:bg-[rgba(255,255,255,0.03)] transition-colors">
@@ -202,7 +235,7 @@
                                     The course code is the SIS ID from Canvas. You can enter multiple IDs separated by
                                     commas. Note: This tool only processes Business (BUS) courses.
                                     <br /><br /><span class="text-white/40">Example:</span><br /> <code
-                                        class="bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.1)] text-white/90 px-2.5 py-1.5 rounded text-[11px] mt-1.5 inline-block font-medium shadow-sm break-all font-mono">BUS-910-UC5--Spring-2026</code>
+                                        class="bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.1)] text-white/90 px-2.5 py-1.5 rounded text-[11px] mt-1.5 inline-block font-medium shadow-sm break-all font-mono">EDU-862-UED4--Spring-2026</code>
                                 </p>
                             </div>
                         </div>
@@ -362,7 +395,7 @@
                     <!-- Custom Course Filter Input -->
                     <div class="h-9 flex items-center gap-1.5 bg-white/[0.02] border border-white/[0.08] rounded-xl px-2.5">
                         <span class="text-[9px] font-semibold text-white/40 uppercase tracking-wider font-mono">Custom Course:</span>
-                        <input type="text" id="custom-course-filter-input" placeholder="e.g. BUS-910, BUS-911"
+                        <input type="text" id="custom-course-filter-input" placeholder="e.g. BUS-940, BUS-902"
                             class="bg-transparent text-white text-xs font-semibold focus:outline-none placeholder-white/20 w-36 h-full py-1" />
                         <button id="btn-add-custom-filter" type="button" class="text-white/40 hover:text-[#EE2C3C] transition-colors focus:outline-none ml-1">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -928,7 +961,8 @@
                 if (q.replied === "No" && q.created_dt_iso && q.learner_name && q.learner_name !== "(No student posts yet)") {
                     const elapsedMs = Date.now() - Date.parse(q.created_dt_iso);
                     const elapsedHrs = elapsedMs / (1000 * 60 * 60);
-                    if (elapsedHrs > 24) {
+                    const threshold = 24;
+                    if (elapsedHrs > threshold) {
                         unansweredDelayed++;
                     }
                 }
@@ -1241,7 +1275,8 @@
                         if (q.created_dt_iso) {
                             const elapsedMs = Date.now() - Date.parse(q.created_dt_iso);
                             const elapsedHrs = elapsedMs / (1000 * 60 * 60);
-                            if (elapsedHrs > 24) {
+                            const threshold = 24;
+                            if (elapsedHrs > threshold) {
                                 courseMap[q.course_name].delayed++;
                                 courseMap[q.course_name].pending_breached++;
                             }
@@ -1364,10 +1399,11 @@
             }
 
             displayMods.forEach(m => {
-                const ratio = Math.min(100, Math.round((m.avgTAT / 24) * 100)); // percent of SLA threshold (24 hours)
+                const threshold = 24;
+                const ratio = Math.min(100, Math.round((m.avgTAT / threshold) * 100));
                 let colorClass = "bg-blue-500";
-                if (m.avgTAT > 24) colorClass = "bg-[#EE2C3C] animate-pulse";
-                else if (m.avgTAT > 12) colorClass = "bg-amber-500";
+                if (m.avgTAT > threshold) colorClass = "bg-[#EE2C3C] animate-pulse";
+                else if (m.avgTAT > (threshold / 2)) colorClass = "bg-amber-500";
 
                 const row = document.createElement('div');
                 row.className = 'space-y-1';
@@ -1457,15 +1493,16 @@
 
             const escalations = [];
 
-            // Alert 1: Unanswered queries pending > 48 hours
+            // Alert 1: Unanswered queries pending past SLA threshold
             queries.forEach(q => {
                 if (q.replied === "No" && q.created_dt_iso) {
                     const elapsedMs = Date.now() - Date.parse(q.created_dt_iso);
                     const elapsedHrs = elapsedMs / (1000 * 60 * 60);
+                    const threshold = 24;
                     // Filter out future dates or parsing errors
-                    if (elapsedHrs > 48 && elapsedHrs < 10000) {
+                    if (elapsedHrs > threshold && elapsedHrs < 10000) {
                         escalations.push({
-                            type: "Unanswered >48 Hours",
+                            type: `Unanswered >${threshold} Hours`,
                             message: `Learner <strong>${q.learner_name}</strong> is awaiting a response for ${Math.round(elapsedHrs)}h in course <strong>${q.course_name}</strong>.`,
                             severity: "critical"
                         });
@@ -1565,7 +1602,8 @@
                 if (q.replied === "No" && q.created_dt_iso && q.learner_name && q.learner_name !== "(No student posts yet)") {
                     const elapsedMs = Date.now() - Date.parse(q.created_dt_iso);
                     const elapsedHrs = elapsedMs / (1000 * 60 * 60);
-                    if (elapsedHrs > 24) {
+                    const threshold = 24;
+                    if (elapsedHrs > threshold) {
                         delayed++;
                     } else {
                         pending++;
@@ -1720,7 +1758,8 @@
                             ? '<span class="px-1.5 py-0.5 text-[8px] text-emerald-400 border border-emerald-500/20 bg-emerald-500/10 rounded-md">On-Time</span>'
                             : '<span class="px-1.5 py-0.5 text-[8px] text-[#EE2C3C] border border-[#EE2C3C]/20 bg-[#EE2C3C]/10 rounded-md">Delayed</span>';
                     } else {
-                        slaBadge = elapsedHrs > 24
+                        const threshold = 24;
+                        slaBadge = elapsedHrs > threshold
                             ? '<span class="px-1.5 py-0.5 text-[8px] text-[#EE2C3C] border border-[#EE2C3C]/20 bg-[#EE2C3C]/10 rounded-md">Delayed</span>'
                             : '<span class="px-1.5 py-0.5 text-[8px] text-amber-400 border border-amber-500/20 bg-amber-500/10 rounded-md">Awaiting</span>';
                     }
@@ -1800,7 +1839,8 @@
                             ? '<span class="px-1.5 py-0.5 text-[8px] text-emerald-400 border border-emerald-500/20 bg-emerald-500/10 rounded-md">On-Time</span>'
                             : '<span class="px-1.5 py-0.5 text-[8px] text-[#EE2C3C] border border-[#EE2C3C]/20 bg-[#EE2C3C]/10 rounded-md">Delayed</span>';
                     } else {
-                        slaBadge = elapsedHrs > 24
+                        const threshold = 24;
+                        slaBadge = elapsedHrs > threshold
                             ? '<span class="px-1.5 py-0.5 text-[8px] text-[#EE2C3C] border border-[#EE2C3C]/20 bg-[#EE2C3C]/10 rounded-md">Delayed</span>'
                             : '<span class="px-1.5 py-0.5 text-[8px] text-amber-400 border border-amber-500/20 bg-amber-500/10 rounded-md">Awaiting</span>';
                     }
@@ -2068,8 +2108,1331 @@
         // Initialize Custom Filter UI on Load
         document.addEventListener('DOMContentLoaded', () => {
             initCustomCourseFilter();
+            initEmailAndSettingsUI();
         });
+
+        // =========================================================================
+        // EMAIL & SIGNATURE SETTINGS + TA EMAIL CONSOLE SCRIPT
+        // =========================================================================
+        const EMAIL_SETTINGS_KEY = 'edgewood_email_settings';
+        let currentScanData = null;
+        let activeTaIndex = 0;
+        let isSendingAll = false;
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('settings-toast');
+            const toastMsg = document.getElementById('settings-toast-msg');
+            const toastIcon = document.getElementById('settings-toast-icon');
+            if (!toast || !toastMsg) return;
+
+            toastMsg.innerText = message;
+            if (type === 'error') {
+                toast.className = 'fixed bottom-6 right-6 z-[100] flex items-center gap-2.5 px-4 py-3 bg-[#1e1315] border border-red-500/30 text-red-200 rounded-xl shadow-2xl text-xs transition-all duration-300 translate-y-0 opacity-100';
+                toastIcon.innerHTML = '<span class="text-red-400 font-bold">✖</span>';
+            } else if (type === 'info') {
+                toast.className = 'fixed bottom-6 right-6 z-[100] flex items-center gap-2.5 px-4 py-3 bg-[#101726] border border-blue-500/30 text-blue-200 rounded-xl shadow-2xl text-xs transition-all duration-300 translate-y-0 opacity-100';
+                toastIcon.innerHTML = '<span class="text-blue-400 font-bold">ℹ</span>';
+            } else {
+                toast.className = 'fixed bottom-6 right-6 z-[100] flex items-center gap-2.5 px-4 py-3 bg-[#121c17] border border-emerald-500/30 text-emerald-200 rounded-xl shadow-2xl text-xs transition-all duration-300 translate-y-0 opacity-100';
+                toastIcon.innerHTML = '<span class="text-emerald-400 font-bold">✔</span>';
+            }
+
+            setTimeout(() => {
+                toast.classList.add('translate-y-4', 'opacity-0');
+            }, 3500);
+        }
+
+        function loadEmailSettings() {
+            let cfg = null;
+            try {
+                const stored = localStorage.getItem(EMAIL_SETTINGS_KEY);
+                if (stored) cfg = JSON.parse(stored);
+            } catch (e) {}
+
+            if (!cfg) {
+                const cookieVal = getCookie(EMAIL_SETTINGS_KEY);
+                if (cookieVal) {
+                    try { cfg = JSON.parse(cookieVal); } catch (e) {}
+                }
+            }
+
+            if (!cfg) {
+                // Populate default signature matching screenshot
+                cfg = {
+                    sender_email: 'omkar.jagtap@upgrad.com',
+                    cc_emails: 'omijagtap304@gmail.com',
+                    app_password: '',
+                    full_name: 'Omkar Jagtap',
+                    job_title: 'Operation Analyst',
+                    office_address: 'Fleet Building, Andheri - Kurla Rd | Gamdevi, Marol, Naka | Mumbai MH 400059',
+                    phone: '+91-9594871400',
+                    contact_email: 'omkar.jagtap@upgrad.com'
+                };
+            }
+
+            if (document.getElementById('cfg-sender-email')) document.getElementById('cfg-sender-email').value = cfg.sender_email || '';
+            if (document.getElementById('cfg-cc-emails')) document.getElementById('cfg-cc-emails').value = cfg.cc_emails || '';
+            if (document.getElementById('cfg-app-password')) document.getElementById('cfg-app-password').value = cfg.app_password || '';
+            if (document.getElementById('cfg-full-name')) document.getElementById('cfg-full-name').value = cfg.full_name || '';
+            if (document.getElementById('cfg-job-title')) document.getElementById('cfg-job-title').value = cfg.job_title || '';
+            if (document.getElementById('cfg-office-address')) document.getElementById('cfg-office-address').value = cfg.office_address || '';
+            if (document.getElementById('cfg-phone')) document.getElementById('cfg-phone').value = cfg.phone || '';
+            if (document.getElementById('cfg-contact-email')) document.getElementById('cfg-contact-email').value = cfg.contact_email || '';
+
+            const feedback = document.getElementById('cfg-verify-feedback');
+            const feedbackMsg = document.getElementById('cfg-verify-msg');
+            if (cfg.app_password && feedback && feedbackMsg) {
+                feedback.classList.remove('hidden');
+                feedbackMsg.innerText = 'Verified (credentials loaded from cookies/storage)';
+            }
+            return cfg;
+        }
+
+        function saveEmailSettings() {
+            const cfg = {
+                sender_email: (document.getElementById('cfg-sender-email').value || '').trim(),
+                cc_emails: (document.getElementById('cfg-cc-emails').value || '').trim(),
+                app_password: (document.getElementById('cfg-app-password').value || '').trim(),
+                full_name: (document.getElementById('cfg-full-name').value || '').trim(),
+                job_title: (document.getElementById('cfg-job-title').value || '').trim(),
+                office_address: (document.getElementById('cfg-office-address').value || '').trim(),
+                phone: (document.getElementById('cfg-phone').value || '').trim(),
+                contact_email: (document.getElementById('cfg-contact-email').value || '').trim()
+            };
+
+            try {
+                localStorage.setItem(EMAIL_SETTINGS_KEY, JSON.stringify(cfg));
+            } catch (e) {}
+
+            // Save to persistent cookie (365 days)
+            setCookie(EMAIL_SETTINGS_KEY, JSON.stringify(cfg), 365);
+
+            const feedback = document.getElementById('cfg-verify-feedback');
+            const feedbackMsg = document.getElementById('cfg-verify-msg');
+            if (feedback && feedbackMsg) {
+                feedback.classList.remove('hidden');
+                feedbackMsg.innerText = 'Saved in local browser cookies & storage';
+            }
+
+            showToast('Email & signature configuration saved successfully!');
+            setTimeout(() => {
+                closeSettingsModal();
+            }, 600);
+            return cfg;
+        }
+
+        function getEmailSettings() {
+            return loadEmailSettings();
+        }
+
+        function openSettingsModal() {
+            loadEmailSettings();
+            const modal = document.getElementById('modal-settings');
+            if (modal) {
+                modal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+            }
+        }
+
+        function closeSettingsModal() {
+            const modal = document.getElementById('modal-settings');
+            if (modal) {
+                modal.classList.add('hidden');
+                document.body.style.overflow = '';
+            }
+        }
+
+        function openEmailModal() {
+            const cfg = getEmailSettings();
+            if (!cfg.sender_email || !cfg.app_password) {
+                showToast('Please configure your Sender Email & App Password in Settings first.', 'info');
+                openSettingsModal();
+                const pwdInput = document.getElementById('cfg-app-password');
+                if (pwdInput) pwdInput.focus();
+                return;
+            }
+
+            const modal = document.getElementById('modal-email-tas');
+            if (modal) {
+                modal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+
+                // Dynamically update preset buttons based on loaded dashboard courses
+                const presetContainer = document.getElementById('email-preset-buttons-container');
+                if (presetContainer && allData && allData.courses && allData.courses.length > 0) {
+                    const uniqueCourses = [...new Set(allData.courses)].filter(c => c && c !== 'N/A');
+                    if (uniqueCourses.length > 0) {
+                        let btnsHtml = '';
+                        uniqueCourses.forEach(c => {
+                            const label = c.length > 12 ? c.substring(0, 10) + '..' : c;
+                            btnsHtml += `<button type="button" onclick="selectEmailPreset('${c}')" class="text-[10px] font-semibold px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-white/80 hover:text-white border border-white/10 transition-all" title="${c}">${label}</button>`;
+                        });
+                        btnsHtml += `<button type="button" onclick="selectEmailPreset('ALL')" class="text-[10px] font-semibold px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-white/80 hover:text-white border border-white/10 transition-all">ALL</button>`;
+                        btnsHtml += `<button type="button" onclick="addCustomEmailPreset()" class="text-[10px] font-bold px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-white border border-white/15 transition-all" title="Add another course shell">+</button>`;
+                        presetContainer.innerHTML = btnsHtml;
+                    }
+                }
+
+                // Pre-fill course shell if input on main page had something
+                const mainCourseInput = document.getElementById('course_codes');
+                const emailCourseInput = document.getElementById('email-search-course-shell');
+                if (emailCourseInput && !emailCourseInput.value && mainCourseInput && mainCourseInput.value) {
+                    const firstCode = mainCourseInput.value.split(/[\s,]+/)[0];
+                    if (firstCode) emailCourseInput.value = firstCode;
+                }
+            }
+        }
+
+        function closeEmailModal() {
+            const modal = document.getElementById('modal-email-tas');
+            if (modal) {
+                modal.classList.add('hidden');
+                document.body.style.overflow = '';
+            }
+        }
+
+        async function verifyAppPassword() {
+            const sender_email = (document.getElementById('cfg-sender-email').value || '').trim();
+            const app_password = (document.getElementById('cfg-app-password').value || '').trim();
+            const feedback = document.getElementById('cfg-verify-feedback');
+            const feedbackMsg = document.getElementById('cfg-verify-msg');
+            const btnText = document.getElementById('btn-verify-text');
+
+            if (!sender_email || !app_password) {
+                alert('Please enter both Sender Email and App Password to verify.');
+                return;
+            }
+
+            btnText.innerText = 'Verifying...';
+            feedback.classList.remove('hidden');
+            feedbackMsg.className = 'text-[11px] text-amber-400 flex items-center gap-1.5';
+            feedbackMsg.innerText = 'Connecting to Google SMTP...';
+
+            try {
+                const res = await fetch('/api/verify-credentials', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sender_email, app_password })
+                });
+                const data = await res.json();
+                if (data.valid) {
+                    feedbackMsg.className = 'text-[11px] text-emerald-400 font-medium flex items-center gap-1.5';
+                    feedbackMsg.innerText = '✔ ' + (data.message || 'Credentials verified with Google SMTP!');
+                    showToast('SMTP authentication successful!');
+                } else {
+                    feedbackMsg.className = 'text-[11px] text-red-400 font-medium flex items-center gap-1.5';
+                    feedbackMsg.innerText = '✖ ' + (data.error || 'Authentication failed.');
+                    showToast(data.error || 'Authentication failed', 'error');
+                }
+            } catch (err) {
+                feedbackMsg.className = 'text-[11px] text-red-400 font-medium flex items-center gap-1.5';
+                feedbackMsg.innerText = '✖ Network error verifying credentials.';
+            } finally {
+                btnText.innerText = 'Verify';
+            }
+        }
+
+        async function scanCoursePendingQueries() {
+            const input = document.getElementById('email-search-course-shell');
+            const courseShell = input ? input.value.trim() : '';
+            if (!courseShell) {
+                showToast('Please enter a Course Shell ID to scan.', 'info');
+                if (input) input.focus();
+                return;
+            }
+
+            const loadingEl = document.getElementById('email-scan-loading');
+            const emptyEl = document.getElementById('email-scan-empty');
+            const resultsEl = document.getElementById('email-scan-results');
+            const scanBtnText = document.getElementById('btn-scan-course-text');
+
+            loadingEl.classList.remove('hidden');
+            emptyEl.classList.add('hidden');
+            resultsEl.classList.add('hidden');
+            if (scanBtnText) scanBtnText.innerText = 'Scanning...';
+
+            try {
+                const res = await fetch('/api/scan-pending-ta-emails', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ course_shell: courseShell })
+                });
+                const data = await res.json();
+
+                if (!data.found) {
+                    loadingEl.classList.add('hidden');
+                    emptyEl.classList.remove('hidden');
+                    emptyEl.innerHTML = `
+                        <div class="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-3">
+                            <span class="text-xl">⚠️</span>
+                        </div>
+                        <h4 class="text-sm font-semibold text-white/90 mb-1">Worksheet Not Found in Google Sheets</h4>
+                        <p class="text-xs text-white/50 max-w-md">${data.error || 'Please run the Canvas audit first so the worksheet is populated in Google Sheets.'}</p>
+                    `;
+                    showToast('Course worksheet not found. Please audit the course first.', 'error');
+                    return;
+                }
+
+                currentScanData = data;
+                activeTaIndex = 0;
+                renderScanResults(data);
+                appendDispatchLog(`[${new Date().toLocaleTimeString()}] Scanned ${data.course_shell}. Found ${data.total_pending} pending queries across ${data.ta_groups.length} TAs.`);
+
+            } catch (err) {
+                loadingEl.classList.add('hidden');
+                emptyEl.classList.remove('hidden');
+                emptyEl.innerHTML = `<p class="text-red-400 text-xs">Error scanning course: ${err.message}</p>`;
+                showToast('Failed to scan course pending queries.', 'error');
+            } finally {
+                loadingEl.classList.add('hidden');
+                if (scanBtnText) scanBtnText.innerText = 'Scan Pending Queries';
+            }
+        }
+
+        function selectEmailPreset(preset) {
+            const input = document.getElementById('email-search-course-shell');
+            if (input) {
+                input.value = preset;
+                scanCoursePendingQueries();
+            }
+        }
+
+        function addCustomEmailPreset() {
+            const custom = prompt("Enter Course Shell ID (e.g. BUS-940, or multiple comma-separated):");
+            if (custom && custom.trim()) {
+                const input = document.getElementById('email-search-course-shell');
+                if (input) {
+                    input.value = custom.trim();
+                    scanCoursePendingQueries();
+                }
+            }
+        }
+
+        function navigateTa(delta) {
+            if (!currentScanData || !currentScanData.ta_groups || currentScanData.ta_groups.length === 0) return;
+            const total = currentScanData.ta_groups.length;
+            let newIndex = activeTaIndex + delta;
+            if (newIndex < 0) newIndex = total - 1;
+            if (newIndex >= total) newIndex = 0;
+            selectActiveTa(newIndex);
+        }
+
+        function setEmailViewMode(mode) {
+            const previewContainer = document.getElementById('email-rendered-preview-container');
+            const editorContainer = document.getElementById('email-text-editor-container');
+            const btnPreview = document.getElementById('btn-tab-preview');
+            const btnEdit = document.getElementById('btn-tab-edit');
+            if (mode === 'preview') {
+                if (previewContainer) previewContainer.classList.remove('hidden');
+                if (editorContainer) editorContainer.classList.add('hidden');
+                if (btnPreview) btnPreview.className = 'px-3 py-1 text-xs font-semibold rounded-lg bg-white/15 text-white shadow-sm transition-all';
+                if (btnEdit) btnEdit.className = 'px-3 py-1 text-xs font-semibold rounded-lg text-white/50 hover:text-white/80 transition-all';
+            } else {
+                if (previewContainer) previewContainer.classList.add('hidden');
+                if (editorContainer) editorContainer.classList.remove('hidden');
+                if (btnEdit) btnEdit.className = 'px-3 py-1 text-xs font-semibold rounded-lg bg-white/15 text-white shadow-sm transition-all';
+                if (btnPreview) btnPreview.className = 'px-3 py-1 text-xs font-semibold rounded-lg text-white/50 hover:text-white/80 transition-all';
+            }
+        }
+
+        function toggleDispatchConsole() {
+            const drawer = document.getElementById('dispatch-log-drawer');
+            const arrow = document.getElementById('dispatch-toggle-arrow');
+            if (!drawer) return;
+            if (drawer.classList.contains('hidden')) {
+                drawer.classList.remove('hidden');
+                if (arrow) arrow.style.transform = 'rotate(180deg)';
+            } else {
+                drawer.classList.add('hidden');
+                if (arrow) arrow.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        function renderScanResults(data) {
+            const resultsEl = document.getElementById('email-scan-results');
+            const emptyEl = document.getElementById('email-scan-empty');
+            if (resultsEl) resultsEl.classList.remove('hidden');
+            if (emptyEl) emptyEl.classList.add('hidden');
+
+            const kpiCourse = document.getElementById('kpi-scan-course');
+            if (kpiCourse) kpiCourse.innerText = data.course_shell || data.course_code || '--';
+            const kpiPending = document.getElementById('kpi-scan-pending');
+            if (kpiPending) kpiPending.innerText = data.total_pending || 0;
+            const kpiTas = document.getElementById('kpi-scan-tas');
+            if (kpiTas) kpiTas.innerText = data.ta_groups.length || 0;
+
+            const badge = document.getElementById('ta-count-badge');
+            if (badge) badge.innerText = `${data.ta_groups.length} TAs`;
+
+            const rosterEl = document.getElementById('ta-roster-list');
+            if (!rosterEl) return;
+            rosterEl.innerHTML = '';
+
+            if (data.ta_groups.length === 0) {
+                rosterEl.innerHTML = `<div class="p-3 text-center text-white/40 text-xs italic">No pending queries found for this course! All clear. 🎉</div>`;
+                return;
+            }
+
+            data.ta_groups.forEach((group, idx) => {
+                const item = document.createElement('div');
+                item.id = `ta-card-${idx}`;
+                const isSelected = idx === activeTaIndex;
+                item.className = `p-2.5 rounded-xl border transition-all cursor-pointer ${
+                    isSelected
+                        ? 'bg-white/[0.08] border-[#EE2C3C]/60 shadow-sm'
+                        : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04]'
+                }`;
+                item.onclick = () => selectActiveTa(idx);
+
+                let statusBadgeHtml = `<span id="ta-status-badge-${idx}" class="text-[9px] text-white/40 font-mono whitespace-nowrap">Draft</span>`;
+                if (group.status === 'sent') {
+                    statusBadgeHtml = `<span id="ta-status-badge-${idx}" class="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">✔ Sent</span>`;
+                } else if (group.status === 'test_sent') {
+                    statusBadgeHtml = `<span id="ta-status-badge-${idx}" class="inline-flex items-center gap-1 text-[9px] font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">✔ Test Sent</span>`;
+                }
+
+                item.innerHTML = `
+                    <div class="flex items-center justify-between gap-1.5 mb-1.5">
+                        <span class="text-xs font-bold text-white leading-tight truncate min-w-0" title="${group.ta_name}">${group.ta_name}</span>
+                        <span id="ta-status-slot-${idx}" class="flex-shrink-0">${statusBadgeHtml}</span>
+                    </div>
+                    <div class="flex items-center justify-between gap-1.5 text-[10px] text-white/40 font-mono">
+                        <span class="truncate min-w-0" title="${group.ta_email || 'No email assigned'}">${group.ta_email || 'No email assigned'}</span>
+                        <span class="text-[9px] px-1.5 py-0.5 rounded-full font-mono font-bold flex-shrink-0 whitespace-nowrap ${
+                            group.queries.length > 5 ? 'bg-red-500/20 text-red-300 border border-red-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                        }">${group.queries.length} Pending</span>
+                    </div>
+                `;
+                rosterEl.appendChild(item);
+            });
+
+            selectActiveTa(0);
+        }
+
+        function selectActiveTa(idx) {
+            activeTaIndex = idx;
+            if (!currentScanData || !currentScanData.ta_groups || !currentScanData.ta_groups[idx]) return;
+
+            const group = currentScanData.ta_groups[idx];
+            const cfg = getEmailSettings();
+            const totalTas = currentScanData.ta_groups.length;
+
+            // Update card styling in left roster
+            currentScanData.ta_groups.forEach((_, i) => {
+                const card = document.getElementById(`ta-card-${i}`);
+                if (card) {
+                    if (i === idx) {
+                        card.className = 'p-2.5 rounded-xl border transition-all cursor-pointer bg-white/[0.08] border-[#EE2C3C]/60 shadow-sm';
+                    } else {
+                        card.className = 'p-2.5 rounded-xl border transition-all cursor-pointer bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04]';
+                    }
+                }
+            });
+
+            // Pagination indicator: 1 of N
+            const pageIndicator = document.getElementById('ta-pagination-indicator');
+            if (pageIndicator) pageIndicator.innerText = `${idx + 1} of ${totalTas}`;
+
+            // Top meta header without TA or long names
+            const topMetaTitle = document.getElementById('draft-top-meta-title');
+            if (topMetaTitle) {
+                topMetaTitle.innerText = `Gentle Reminder | Discussion Forum Queries | ${group.queries.length} Pending`;
+                topMetaTitle.title = topMetaTitle.innerText;
+            }
+
+            // Sender / Recipient / SPOC Bar
+            const senderInitial = (cfg.full_name || 'O').charAt(0).toUpperCase();
+            const avatarInitialEl = document.getElementById('sender-avatar-initial');
+            if (avatarInitialEl) avatarInitialEl.innerText = senderInitial;
+
+            const barSender = document.getElementById('bar-sender-text');
+            if (barSender) barSender.innerText = `${cfg.full_name || 'Omkar Jagtap'} <${cfg.sender_email}>`;
+
+            const barRecipient = document.getElementById('bar-recipient-text');
+            if (barRecipient) barRecipient.innerText = `${group.ta_name} <${group.ta_email || 'No email assigned'}>`;
+
+            const barCc = document.getElementById('bar-cc-text');
+            if (barCc) barCc.innerText = cfg.cc_emails ? `(Cc: ${cfg.cc_emails})` : '';
+
+            const barSpoc = document.getElementById('bar-spoc-tag');
+            if (barSpoc) barSpoc.innerText = `SPOC: ${cfg.full_name ? cfg.full_name.split(' ')[0] : 'Omkar'}`;
+
+            // Subject Line: Clean format "Gentle Reminder | Discussion Forum Queries" (no TA name, no course shell)
+            const subjectInput = document.getElementById('draft-subject-input');
+            const defaultSubject = `Gentle Reminder | Discussion Forum Queries`;
+            if (subjectInput) subjectInput.value = defaultSubject;
+
+            // TA name helpers: extract last name for academic salutation
+            const taFullName = group.ta_name.trim();
+            const taCleanName = taFullName.replace(/^(Dr\.|Doctor|Prof\.|Professor)\s+/i, '').trim();
+            const taNameParts = taCleanName.split(/\s+/);
+            const taLastName = taNameParts.length > 1 ? taNameParts[taNameParts.length - 1] : taNameParts[0];
+            const taSalutation = `Dear Dr. ${taLastName},`;
+            const courseShellLabel = currentScanData.course_shell || currentScanData.course_code || '';
+            const multiCourse = currentScanData.course_shells_scanned && currentScanData.course_shells_scanned.length > 1;
+            const courseDisplay = multiCourse
+                ? (currentScanData.course_shells_scanned || []).join(', ')
+                : courseShellLabel;
+
+            const overview = currentScanData.course_overview || {
+                total_posts: group.queries.length,
+                total_replied: 0,
+                within_sla: 0,
+                outside_sla: 0,
+                avg_response_hr: 0,
+                pending_count: currentScanData.total_pending || group.queries.length,
+                avg_pending_hr: 0
+            };
+
+            // Format the Discussion Summary as an aligned center-aligned table
+            const sumTblHeader1 = `+-------------+---------------------------------------+-----------------------+`;
+            const sumTblCategory= `| Total Post  |            Total Response             |   Pending Response    |`;
+            const sumTblDivider = `+-------------+-----------+-------------+-------------+---------------+-------+`;
+            const sumTblSubHdrs = `| Total Query | Within SLA| Outside SLA | Avg Resp HR | Pending Count |  Avg  |`;
+            const sumTblSubDiv  = `+-------------+-----------+-------------+-------------+---------------+-------+`;
+            const col1 = String(overview.total_posts).padEnd(11);
+            const col2 = String(overview.within_sla).padEnd(9);
+            const col3 = String(overview.outside_sla).padEnd(11);
+            const col4 = (String(overview.avg_response_hr) + ' hrs').padEnd(11);
+            const col5 = String(overview.pending_count).padEnd(13);
+            const col6 = (String(overview.avg_pending_hr) + ' hrs').padEnd(5);
+            const sumTblData    = `| ${col1} | ${col2} | ${col3} | ${col4} | ${col5} | ${col6} |`;
+            const sumTblBottom  = `+-------------+-----------+-------------+-------------+---------------+-------+`;
+
+            const overviewTableText = [
+                sumTblHeader1,
+                sumTblCategory,
+                sumTblDivider,
+                sumTblSubHdrs,
+                sumTblSubDiv,
+                sumTblData,
+                sumTblBottom
+            ].join('\n');
+
+            // Plain text signature
+            const plainSignature = [
+                'Regards,',
+                cfg.full_name || 'Omkar Jagtap',
+                cfg.job_title || 'Operation Analyst',
+                '',
+                cfg.office_address || 'Fleet Building, Andheri - Kurla Rd | Gamdevi, Marol, Naka | Mumbai MH 400059',
+                `m ${cfg.phone || '+91-9594871400'} |`,
+                '',
+                `e ${cfg.contact_email || 'omkar.jagtap@upgrad.com'}| https://www.upgrad.com/`,
+                'Follow us: Facebook | Twitter | LinkedIn | YouTube'
+            ].join('\n');
+
+            // Plain text table
+            const tableHeader = `#  | Course Shell                | Learner Name          | Student Email                  | Discussion Topic                              | Date Raised`;
+            const tableDivider = `-`.repeat(tableHeader.length);
+            const tableRows = group.queries.map((q, i) => {
+                const course = q.course_shell || q.course_code || courseShellLabel;
+                const n = String(i + 1).padEnd(2);
+                const c = course.padEnd(27).slice(0, 27);
+                const ln = (q.learner_name || '').padEnd(21).slice(0, 21);
+                const em = (q.learner_email || '').padEnd(30).slice(0, 30);
+                const tp = (q.topic || '').padEnd(45).slice(0, 45);
+                const dt = q.created_on || '';
+                return `${n} | ${c} | ${ln} | ${em} | ${tp} | ${dt}`;
+            }).join('\n');
+
+            // Discussion Summary is placed at the TOP right after the introductory reminder
+            const bodyText = `${taSalutation}
+
+I hope you are doing well.
+
+This is a general reminder that the following learners assigned to you have raised queries on the Discussion Board for the course ${courseDisplay}, and currently have pending queries awaiting a response on the Canvas Discussion Board.
+
+DISCUSSION SUMMARY:
+${overviewTableText}
+
+Please find below the summary of pending learner queries:
+
+${tableHeader}
+${tableDivider}
+${tableRows}
+${tableDivider}
+
+${plainSignature}`;
+
+            const textarea = document.getElementById('draft-body-textarea');
+            if (textarea) textarea.value = bodyText;
+
+            // Render live clean corporate HTML email preview
+            const previewContainer = document.getElementById('email-rendered-preview-container');
+            if (previewContainer) {
+                previewContainer.innerHTML = buildHtmlBody(bodyText, group);
+            }
+
+            const sendSingleBtnText = document.getElementById('btn-send-single-text');
+            if (sendSingleBtnText) sendSingleBtnText.innerText = `Send Email to ${taFullName}`;
+        }
+
+        function buildHtmlBody(plainText, group) {
+            const cfg = getEmailSettings();
+            const multiCourse = currentScanData.course_shells_scanned && currentScanData.course_shells_scanned.length > 1;
+            const courseShellLabel = currentScanData.course_shell || currentScanData.course_code;
+            const taFullName = group.ta_name.trim();
+            const courseDisplay = multiCourse
+                ? (currentScanData.course_shells_scanned || []).join(', ')
+                : courseShellLabel;
+
+            const overview = currentScanData.course_overview || {
+                total_posts: group.queries.length,
+                total_replied: 0,
+                within_sla: 0,
+                outside_sla: 0,
+                avg_response_hr: 0,
+                pending_count: currentScanData.total_pending || group.queries.length,
+                avg_pending_hr: 0
+            };
+
+            const queriesHtml = group.queries.map((q, idx) => {
+                const course = q.course_shell || q.course_code || courseShellLabel;
+                return `
+                <tr style="background: #ffffff; border-bottom: 1px solid #e5e7eb; text-align: center;">
+                    <td style="padding: 7px 10px; font-size: 12px; color: #6b7280; font-weight: 600; text-align: center; border-right: 1px solid #e5e7eb; width: 30px;">${idx + 1}</td>
+                    <td style="padding: 7px 10px; font-size: 12px; font-weight: 600; color: #1e40af; border-right: 1px solid #e5e7eb; text-align: center; white-space: nowrap;">${course}</td>
+                    <td style="padding: 7px 10px; font-size: 13px; font-weight: 600; color: #111827; border-right: 1px solid #e5e7eb; text-align: center;">${q.learner_name}</td>
+                    <td style="padding: 7px 10px; font-size: 12px; color: #2563eb; border-right: 1px solid #e5e7eb; text-align: center;"><a href="mailto:${q.learner_email}" style="color: #2563eb; text-decoration: underline;">${q.learner_email}</a></td>
+                    <td style="padding: 7px 10px; font-size: 12px; color: #374151; border-right: 1px solid #e5e7eb; text-align: center;">${q.topic}</td>
+                    <td style="padding: 7px 10px; font-size: 11px; color: #6b7280; text-align: center; white-space: nowrap;">${q.created_on}</td>
+                </tr>`;
+            }).join('');
+
+            const totalCount = group.queries.length;
+            const fullName = cfg.full_name || 'Omkar Jagtap';
+            const jobTitle = cfg.job_title || 'Operation Analyst';
+            const officeAddress = cfg.office_address || 'Fleet Building, Andheri - Kurla Rd | Gamdevi, Marol, Naka | Mumbai MH 400059';
+            const phone = cfg.phone || '+91-9594871400';
+            const cleanPhone = phone.replace(/[^\d+]/g, '');
+            const contactEmail = cfg.contact_email || 'omkar.jagtap@upgrad.com';
+
+            // Compute last name for salutation inside buildHtmlBody
+            const bCleanName = group.ta_name.trim().replace(/^(Dr\.|Doctor|Prof\.|Professor)\s+/i, '').trim();
+            const bNameParts = bCleanName.split(/\s+/);
+            const bLastName = bNameParts.length > 1 ? bNameParts[bNameParts.length - 1] : bNameParts[0];
+
+            return `
+            <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 13px; color: #1e293b; line-height: 1.6; margin: 0; padding: 0; background: #ffffff; text-align: left;">
+
+              <p style="margin: 0 0 14px 0; font-size: 14px; color: #111827;">Dear <strong>Dr. ${bLastName}</strong>,</p>
+
+              <p style="margin: 0 0 14px 0; font-size: 13px; color: #374151;">I hope you are doing well.</p>
+
+              <p style="margin: 0 0 16px 0; font-size: 13px; color: #374151; line-height: 1.6;">
+                This is a general reminder that the following learners assigned to you have raised queries on the Discussion Board for the course
+                <strong>${courseDisplay}</strong>, and currently have pending queries awaiting a response on the Canvas Discussion Board.
+              </p>
+
+              <!-- Discussion Summary Table (At the top, Center Aligned, No TA repetition) -->
+              <div style="margin: 16px 0 18px 0; border: 1px solid #d1d5db; border-radius: 8px; overflow: hidden; background: #ffffff;">
+                <div style="background: #1e3a8a; padding: 9px 14px; color: #ffffff; font-weight: 700; font-size: 12px; letter-spacing: 0.3px; text-align: center;">
+                  DISCUSSION SUMMARY
+                </div>
+                <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; width: 100%; font-size: 11px; text-align: center;">
+                  <thead>
+                    <tr style="background: #f1f5f9; border-bottom: 1px solid #cbd5e1;">
+                      <th style="padding: 8px 10px; font-weight: 700; color: #1e293b; text-align: center; border-right: 1px solid #cbd5e1; width: 16%;">Total Post</th>
+                      <th colspan="3" style="padding: 8px 10px; font-weight: 700; color: #166534; background: #dcfce7; text-align: center; border-right: 1px solid #cbd5e1; width: 50%;">Total Response</th>
+                      <th colspan="2" style="padding: 8px 10px; font-weight: 700; color: #991b1b; background: #fee2e2; text-align: center; width: 34%;">Pending Response</th>
+                    </tr>
+                    <tr style="background: #f8fafc; border-bottom: 1px solid #cbd5e1; font-size: 10px; color: #475569;">
+                      <th style="padding: 6px 8px; font-weight: 600; text-align: center; border-right: 1px solid #cbd5e1;">Total Queries</th>
+                      <th style="padding: 6px 8px; font-weight: 600; text-align: center; border-right: 1px solid #cbd5e1;">Within SLA</th>
+                      <th style="padding: 6px 8px; font-weight: 600; text-align: center; border-right: 1px solid #cbd5e1;">Outside SLA</th>
+                      <th style="padding: 6px 8px; font-weight: 600; text-align: center; border-right: 1px solid #cbd5e1;">Avg. Response HR</th>
+                      <th style="padding: 6px 8px; font-weight: 600; text-align: center; border-right: 1px solid #cbd5e1;">Pending Count</th>
+                      <th style="padding: 6px 8px; font-weight: 600; text-align: center;">Avg</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr style="text-align: center; font-size: 11px; font-weight: 600; color: #0f172a;">
+                      <td style="padding: 9px; border-right: 1px solid #cbd5e1; background: #f8fafc; text-align: center;">${overview.total_posts}</td>
+                      <td style="padding: 9px; border-right: 1px solid #cbd5e1; color: #15803d; text-align: center;">${overview.within_sla}</td>
+                      <td style="padding: 9px; border-right: 1px solid #cbd5e1; color: #b91c1c; text-align: center;">${overview.outside_sla}</td>
+                      <td style="padding: 9px; border-right: 1px solid #cbd5e1; text-align: center;">${overview.avg_response_hr} hrs</td>
+                      <td style="padding: 9px; border-right: 1px solid #cbd5e1; color: #b91c1c; font-weight: 700; text-align: center;">${overview.pending_count}</td>
+                      <td style="padding: 9px; color: #64748b; text-align: center;">${overview.avg_pending_hr} hrs</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <p style="margin: 18px 0 8px 0; font-size: 13px; color: #374151; font-weight: 600;">
+                Pending Learner Queries Details:
+              </p>
+
+              <!-- Clean Corporate Table (Learner Details, Center Aligned) -->
+              <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; width: 100%; margin: 8px 0 20px 0; font-size: 12px; border: 1px solid #d1d5db; text-align: center;">
+                <thead>
+                  <tr style="background: #f9fafb; border-bottom: 1px solid #d1d5db; text-align: center;">
+                    <th style="padding: 8px 10px; font-size: 11px; font-weight: 700; color: #374151; text-align: center; border-right: 1px solid #e5e7eb; width: 30px;">#</th>
+                    <th style="padding: 8px 10px; font-size: 11px; font-weight: 700; color: #374151; text-align: center; border-right: 1px solid #e5e7eb;">Course Shell</th>
+                    <th style="padding: 8px 10px; font-size: 11px; font-weight: 700; color: #374151; text-align: center; border-right: 1px solid #e5e7eb;">Learner Name</th>
+                    <th style="padding: 8px 10px; font-size: 11px; font-weight: 700; color: #374151; text-align: center; border-right: 1px solid #e5e7eb;">Student Email</th>
+                    <th style="padding: 8px 10px; font-size: 11px; font-weight: 700; color: #374151; text-align: center; border-right: 1px solid #e5e7eb;">Discussion Topic</th>
+                    <th style="padding: 8px 10px; font-size: 11px; font-weight: 700; color: #374151; text-align: center;">Date Raised</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${queriesHtml}
+                  <tr style="background: #f9fafb; border-top: 1px solid #e5e7eb;">
+                    <td colspan="6" style="padding: 6px 10px; font-size: 11px; color: #6b7280; font-style: italic; text-align: center;">
+                      Showing ${totalCount} of ${totalCount} pending ${totalCount === 1 ? 'query' : 'queries'}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <!-- Exact Signature from Screenshot 1 -->
+              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 13px; color: #1e293b; line-height: 1.5; margin-top: 24px; padding-top: 14px; border-top: 1px solid #f1f5f9;">
+                <p style="margin: 0 0 2px 0;">Regards,</p>
+                <p style="margin: 0; font-size: 14px; font-weight: 700; color: #0f172a;">${fullName}</p>
+                <p style="margin: 0 0 16px 0; font-size: 13px; color: #475569;">${jobTitle}</p>
+
+                <p style="margin: 0 0 4px 0; font-size: 12px; color: #334155;">${officeAddress}</p>
+                <p style="margin: 0 0 16px 0; font-size: 12px; color: #334155;"><strong>m</strong> <a href="tel:${cleanPhone}" style="color: #2563eb; text-decoration: underline;">${phone}</a> |</p>
+
+                <p style="margin: 0 0 4px 0; font-size: 12px; color: #334155;"><strong>e</strong> <a href="mailto:${contactEmail}" style="color: #2563eb; text-decoration: underline;">${contactEmail}</a>| <a href="https://www.upgrad.com/" target="_blank" style="color: #2563eb; text-decoration: underline;">https://www.upgrad.com/</a></p>
+                <p style="margin: 0; font-size: 12px; color: #334155;"><strong>Follow us:</strong> 
+                  <a href="https://www.facebook.com/upGradGlobal/" target="_blank" style="color: #2563eb; text-decoration: underline;">Facebook</a> | 
+                  <a href="https://twitter.com/upGrad_edu" target="_blank" style="color: #2563eb; text-decoration: underline;">Twitter</a> | 
+                  <a href="https://www.linkedin.com/company/upgrad/" target="_blank" style="color: #2563eb; text-decoration: underline;">LinkedIn</a> | 
+                  <a href="https://www.youtube.com/channel/UCyv2qPz6Q5rX8yN277mO6_Q" target="_blank" style="color: #2563eb; text-decoration: underline;">YouTube</a>
+                </p>
+              </div>
+
+            </div>`;
+        }
+
+        async function sendSingleTaEmail(idx, isTest = false) {
+            if (!currentScanData || !currentScanData.ta_groups || !currentScanData.ta_groups[idx]) return false;
+            const group = currentScanData.ta_groups[idx];
+            const cfg = getEmailSettings();
+
+            if (!group.ta_email) {
+                alert(`Cannot send email: No email address found for ${group.ta_name}`);
+                return false;
+            }
+            if (!cfg.sender_email || !cfg.app_password) {
+                showToast('Please save your Sender Email & App Password in Settings first.', 'error');
+                openSettingsModal();
+                return false;
+            }
+
+            const sendBtn = isTest
+                ? document.getElementById('btn-send-test-email')
+                : document.getElementById('btn-send-single-ta');
+            const originalHtml = sendBtn ? sendBtn.innerHTML : '';
+            if (sendBtn) { sendBtn.innerHTML = `<span>${isTest ? 'Sending Test...' : 'Sending...'}</span>`; sendBtn.disabled = true; }
+
+            const subjectInput = document.getElementById('draft-subject-input');
+            const courseShellLabel = currentScanData.course_shell || currentScanData.course_code;
+            const subject = subjectInput && subjectInput.value.trim() ? subjectInput.value.trim() : `Gentle Reminder | Discussion Forum Queries`;
+            const textarea = document.getElementById('draft-body-textarea');
+            const bodyText = textarea ? textarea.value.trim() : '';
+            const bodyHtml = buildHtmlBody(bodyText, group);
+
+            const logPrefix = isTest ? '[TEST] ' : '';
+            appendDispatchLog(`[${new Date().toLocaleTimeString()}] ${logPrefix}Dispatching to ${group.ta_name} (${isTest ? cfg.sender_email + ' — TEST PREVIEW' : group.ta_email})...`);
+            updateStatusBar(`Dispatching email to ${group.ta_name}...`, 'busy');
+
+            try {
+                const res = await fetch('/api/send-ta-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sender_email: cfg.sender_email,
+                        app_password: cfg.app_password,
+                        to_email: group.ta_email,
+                        cc_emails: isTest ? '' : cfg.cc_emails,
+                        subject: subject,
+                        course_shell: courseShellLabel,
+                        body_text: bodyText,
+                        body_html: bodyHtml,
+                        ta_name: group.ta_name,
+                        full_name: cfg.full_name,
+                        is_test: isTest
+                    })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    if (isTest) {
+                        group.status = 'test_sent';
+                        appendDispatchLog(`[${new Date().toLocaleTimeString()}] ✔ TEST PREVIEW delivered to ${cfg.sender_email} (original TA: ${group.ta_email})`);
+                        showToast(`Test preview sent to your inbox! (${cfg.sender_email})`);
+                        updateStatusBar(`Test preview delivered to ${cfg.sender_email}`, 'success');
+                        const slot = document.getElementById(`ta-status-slot-${idx}`);
+                        if (slot) {
+                            slot.innerHTML = `<span id="ta-status-badge-${idx}" class="inline-flex items-center gap-1 text-[9px] font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">✔ Test Sent</span>`;
+                        }
+                    } else {
+                        group.status = 'sent';
+                        appendDispatchLog(`[${new Date().toLocaleTimeString()}] ✔ SUCCESS: Email delivered to ${group.ta_email} (CC: ${data.cc ? data.cc.join(', ') : 'None'})`);
+                        showToast(`Reminder email delivered to ${group.ta_name}!`);
+                        updateStatusBar(`Email delivered to ${group.ta_name} (${group.ta_email})`, 'success');
+                        const slot = document.getElementById(`ta-status-slot-${idx}`);
+                        if (slot) {
+                            slot.innerHTML = `<span id="ta-status-badge-${idx}" class="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-full whitespace-nowrap flex-shrink-0">✔ Sent</span>`;
+                        }
+                    }
+                    return true;
+                } else {
+                    appendDispatchLog(`[${new Date().toLocaleTimeString()}] ✖ FAILED for ${group.ta_email}: ${data.error}`);
+                    showToast(`Failed: ${data.error}`, 'error');
+                    updateStatusBar(`Failed: ${data.error}`, 'error');
+                    return false;
+                }
+            } catch (err) {
+                appendDispatchLog(`[${new Date().toLocaleTimeString()}] ✖ ERROR: ${err.message}`);
+                showToast(`Network error: ${err.message}`, 'error');
+                updateStatusBar(`Network error: ${err.message}`, 'error');
+                return false;
+            } finally {
+                if (sendBtn) { sendBtn.innerHTML = originalHtml; sendBtn.disabled = false; }
+            }
+        }
+
+        function updateStatusBar(msg, state = 'ready') {
+            const statusEl = document.getElementById('dispatch-status-indicator');
+            if (!statusEl) return;
+            let dotClass = 'bg-emerald-400';
+            if (state === 'busy') dotClass = 'bg-amber-400 animate-spin';
+            else if (state === 'error') dotClass = 'bg-red-400';
+            statusEl.innerHTML = `<span class="w-1.5 h-1.5 rounded-full ${dotClass}"></span><span>${msg}</span>`;
+        }
+
+        function sendTestEmailToMe() {
+            sendSingleTaEmail(activeTaIndex, true);
+        }
+
+        async function sendAllTaEmailsBatch(isTest = false) {
+            if (!currentScanData || !currentScanData.ta_groups || currentScanData.ta_groups.length === 0) return;
+            const cfg = getEmailSettings();
+            if (!cfg.sender_email || !cfg.app_password) {
+                showToast('Please save your Sender Email & App Password in Settings first.', 'error');
+                openSettingsModal();
+                return;
+            }
+
+            const total = currentScanData.ta_groups.length;
+            if (!isTest) {
+                if (!confirm(`Are you sure you want to send official reminder emails to all ${total} assigned TAs? This cannot be undone.`)) return;
+            } else {
+                if (!confirm(`Send test preview of all ${total} TA email drafts to your inbox (${cfg.sender_email})?`)) return;
+            }
+
+            const btn = isTest ? document.getElementById('btn-batch-test-all') : document.getElementById('btn-send-all-tas');
+            if (btn) btn.disabled = true;
+            appendDispatchLog(`[${new Date().toLocaleTimeString()}] --- Starting ${isTest ? 'TEST BATCH' : 'Batch Dispatch'} for ${total} TAs ---`);
+
+            let successCount = 0;
+            for (let i = 0; i < total; i++) {
+                selectActiveTa(i);
+                if (btn) btn.innerHTML = `<span>${isTest ? 'Testing' : 'Sending'} (${i + 1}/${total})...</span>`;
+                const ok = await sendSingleTaEmail(i, isTest);
+                if (ok) successCount++;
+                await new Promise(r => setTimeout(r, 700));
+            }
+
+            const label = isTest ? 'Test previews sent' : 'Emails sent';
+            if (btn) {
+                btn.innerHTML = `<span>${label}: ${successCount}/${total}</span>`;
+                setTimeout(() => {
+                    btn.innerHTML = isTest ? '<span>Test All</span>' : '<svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg><span>Send Official to All TAs</span>';
+                    btn.disabled = false;
+                }, 3000);
+            }
+            appendDispatchLog(`[${new Date().toLocaleTimeString()}] --- Batch Finished: ${successCount}/${total} ${isTest ? 'test previews' : 'emails'} dispatched ---`);
+            showToast(`${label}: ${successCount} of ${total}.`);
+        }
+
+        async function sendAllTaEmails() { return sendAllTaEmailsBatch(false); }
+
+        function appendDispatchLog(msg) {
+            const terminal = document.getElementById('dispatch-log-terminal');
+            if (!terminal) return;
+            if (terminal.children.length === 1 && terminal.children[0].innerText.includes('Ready for email dispatch')) {
+                terminal.innerHTML = '';
+            }
+            const line = document.createElement('div');
+            line.className = msg.includes('✖') ? 'text-red-400' : (msg.includes('✔') ? 'text-emerald-400 font-medium' : 'text-white/80');
+            line.innerText = msg;
+            terminal.appendChild(line);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+
+        function clearDispatchLog() {
+            const terminal = document.getElementById('dispatch-log-terminal');
+            if (terminal) {
+                terminal.innerHTML = '<div class="text-white/40 italic">Log cleared. Ready for next activity...</div>';
+            }
+        }
+
+        function initEmailAndSettingsUI() {
+            // Load saved settings
+            loadEmailSettings();
+
+            // Nav buttons
+            const navBtnEmail = document.getElementById('nav-btn-email-tas');
+            if (navBtnEmail) navBtnEmail.addEventListener('click', openEmailModal);
+
+            const navBtnSettings = document.getElementById('nav-btn-settings');
+            if (navBtnSettings) navBtnSettings.addEventListener('click', openSettingsModal);
+
+            // Settings Modal controls
+            const btnCloseSettings = document.getElementById('btn-close-settings');
+            if (btnCloseSettings) btnCloseSettings.addEventListener('click', closeSettingsModal);
+
+            const btnCancelSettings = document.getElementById('btn-cancel-settings');
+            if (btnCancelSettings) btnCancelSettings.addEventListener('click', closeSettingsModal);
+
+            const btnSaveSettings = document.getElementById('btn-save-settings');
+            if (btnSaveSettings) btnSaveSettings.addEventListener('click', saveEmailSettings);
+
+            const btnVerifyCredentials = document.getElementById('btn-verify-credentials');
+            if (btnVerifyCredentials) btnVerifyCredentials.addEventListener('click', verifyAppPassword);
+
+            const btnQuickLaunchEmail = document.getElementById('btn-quick-launch-email');
+            if (btnQuickLaunchEmail) btnQuickLaunchEmail.addEventListener('click', () => {
+                closeSettingsModal();
+                openEmailModal();
+            });
+
+            // Password visibility toggle
+            const btnTogglePwd = document.getElementById('btn-toggle-app-pwd');
+            if (btnTogglePwd) {
+                btnTogglePwd.addEventListener('click', () => {
+                    const pwdInput = document.getElementById('cfg-app-password');
+                    if (pwdInput) {
+                        if (pwdInput.type === 'password') {
+                            pwdInput.type = 'text';
+                        } else {
+                            pwdInput.type = 'password';
+                        }
+                    }
+                });
+            }
+
+            // Email Modal controls
+            const btnCloseEmailModal = document.getElementById('btn-close-email-modal');
+            if (btnCloseEmailModal) btnCloseEmailModal.addEventListener('click', closeEmailModal);
+
+            const btnScanCourse = document.getElementById('btn-scan-course-pending');
+            if (btnScanCourse) btnScanCourse.addEventListener('click', scanCoursePendingQueries);
+
+            const emailShellInput = document.getElementById('email-search-course-shell');
+            if (emailShellInput) {
+                emailShellInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        scanCoursePendingQueries();
+                    }
+                });
+            }
+
+            // Close modals when clicking backdrop
+            const modalSettings = document.getElementById('modal-settings');
+            if (modalSettings) {
+                modalSettings.addEventListener('click', (e) => {
+                    if (e.target === modalSettings) closeSettingsModal();
+                });
+            }
+
+            const modalEmail = document.getElementById('modal-email-tas');
+            if (modalEmail) {
+                modalEmail.addEventListener('click', (e) => {
+                    if (e.target === modalEmail) closeEmailModal();
+                });
+            }
+        }
     </script>
+
+    <!-- ========================================================================= -->
+    <!-- FLOATING TOAST NOTIFICATION                                              -->
+    <!-- ========================================================================= -->
+    <div id="settings-toast" class="fixed bottom-6 right-6 z-[100] flex items-center gap-2.5 px-4 py-3 bg-[#121c17] border border-emerald-500/30 text-emerald-200 rounded-xl shadow-2xl text-xs transition-all duration-300 translate-y-4 opacity-0 pointer-events-none">
+        <span id="settings-toast-icon"><span class="text-emerald-400 font-bold">✔</span></span>
+        <span id="settings-toast-msg" class="font-medium">Settings saved</span>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- MODAL 1: EMAIL & SIGNATURE SETTINGS (Matching exact screenshot design)    -->
+    <!-- ========================================================================= -->
+    <div id="modal-settings" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md hidden transition-opacity duration-300">
+        <div class="relative w-full max-w-4xl bg-[#0c0c11] border border-white/10 rounded-2xl shadow-2xl overflow-hidden p-6 md:p-8 animate-in fade-in zoom-in-95 duration-200">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between pb-5 border-b border-white/[0.08] mb-6">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-6 h-6 rounded-lg bg-[#EE2C3C]/10 border border-[#EE2C3C]/30 flex items-center justify-center text-[#EE2C3C]">
+                        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-xs md:text-sm font-bold tracking-wider text-white uppercase">EMAIL & SIGNATURE SETTINGS</h3>
+                </div>
+                <button id="btn-close-settings" class="text-white/40 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Two-Column Layout -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 mb-8">
+                <!-- Left Panel: SENDING CREDENTIALS -->
+                <div class="space-y-4">
+                    <div class="flex items-center gap-2 mb-1">
+                        <h4 class="text-[10px] font-bold text-white/50 uppercase tracking-widest">SENDING CREDENTIALS</h4>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[9px] font-semibold text-white/40 uppercase tracking-wider mb-1.5">SENDER EMAIL ID</label>
+                            <input type="email" id="cfg-sender-email" placeholder="omkar.jagtap@upgrad.com"
+                                class="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-[#EE2C3C]/60 focus:ring-1 focus:ring-[#EE2C3C]/30 transition-all font-mono">
+                        </div>
+                        <div>
+                            <label class="block text-[9px] font-semibold text-white/40 uppercase tracking-wider mb-1.5">CC EMAILS</label>
+                            <input type="text" id="cfg-cc-emails" placeholder="omijagtap304@gmail.com"
+                                class="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-[#EE2C3C]/60 focus:ring-1 focus:ring-[#EE2C3C]/30 transition-all font-mono">
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex justify-between items-center mb-1.5">
+                            <label class="block text-[9px] font-semibold text-white/40 uppercase tracking-wider">
+                                APP PASSWORD <span class="text-amber-400 font-bold">(SESSION-ONLY)</span>
+                            </label>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="relative flex-grow">
+                                <input type="password" id="cfg-app-password" placeholder="•••••••••••••"
+                                    class="w-full bg-black/40 border border-white/10 rounded-xl pl-3 pr-9 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-[#EE2C3C]/60 focus:ring-1 focus:ring-[#EE2C3C]/30 transition-all font-mono">
+                                <button type="button" id="btn-toggle-app-pwd" class="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            <button type="button" id="btn-verify-credentials"
+                                class="px-3.5 py-2 bg-[#1a1a24] hover:bg-[#252533] border border-white/10 rounded-xl text-xs font-semibold text-white/80 hover:text-white transition-all flex items-center gap-1.5 flex-shrink-0">
+                                <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                                </svg>
+                                <span id="btn-verify-text">Verify</span>
+                            </button>
+                        </div>
+                        <div id="cfg-verify-feedback" class="text-[11px] mt-1.5 flex items-center gap-1.5 text-emerald-400 hidden">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                            <span id="cfg-verify-msg">Verified (credentials loaded from cookies)</span>
+                        </div>
+                    </div>
+
+                    <!-- Callout Box Matching Screenshot -->
+                    <div class="p-3 bg-blue-500/[0.08] border border-blue-500/20 rounded-xl text-[11px] text-blue-200/90 leading-relaxed flex items-start gap-2.5">
+                        <span class="text-blue-400 font-bold text-xs mt-0.5">ℹ</span>
+                        <span><strong>App Password:</strong> The App Password is saved locally in your browser to avoid re-entering it. If you clear your browser cookies/caches, this password will be reset.</span>
+                    </div>
+                </div>
+
+                <!-- Right Panel: EMAIL SIGNATURE DETAILS -->
+                <div class="space-y-4">
+                    <div class="flex items-center gap-2 mb-1">
+                        <h4 class="text-[10px] font-bold text-white/50 uppercase tracking-widest">EMAIL SIGNATURE DETAILS</h4>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[9px] font-semibold text-white/40 uppercase tracking-wider mb-1.5">FULL NAME</label>
+                            <input type="text" id="cfg-full-name" placeholder="Omkar Jagtap"
+                                class="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-[#EE2C3C]/60 focus:ring-1 focus:ring-[#EE2C3C]/30 transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-[9px] font-semibold text-white/40 uppercase tracking-wider mb-1.5">JOB TITLE</label>
+                            <input type="text" id="cfg-job-title" placeholder="Operation Analyst"
+                                class="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-[#EE2C3C]/60 focus:ring-1 focus:ring-[#EE2C3C]/30 transition-all">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[9px] font-semibold text-white/40 uppercase tracking-wider mb-1.5">OFFICE ADDRESS</label>
+                        <input type="text" id="cfg-office-address" placeholder="3rd Floor, CTS-796-A | Fleet Bldg. Opp. Marol Fire Station, Marol, Andheri East, Mumbai 400059"
+                            class="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-[#EE2C3C]/60 focus:ring-1 focus:ring-[#EE2C3C]/30 transition-all">
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[9px] font-semibold text-white/40 uppercase tracking-wider mb-1.5">PHONE NUMBER</label>
+                            <input type="text" id="cfg-phone" placeholder="+919594871400"
+                                class="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-[#EE2C3C]/60 focus:ring-1 focus:ring-[#EE2C3C]/30 transition-all">
+                        </div>
+                        <div>
+                            <label class="block text-[9px] font-semibold text-white/40 uppercase tracking-wider mb-1.5">CONTACT EMAIL</label>
+                            <input type="email" id="cfg-contact-email" placeholder="omkar.jagtap@upgrad.com"
+                                class="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 focus:outline-none focus:border-[#EE2C3C]/60 focus:ring-1 focus:ring-[#EE2C3C]/30 transition-all font-mono">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-white/[0.08]">
+                <button type="button" id="btn-quick-launch-email"
+                    class="w-full sm:w-auto px-4 py-2 text-xs font-semibold text-white/80 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all flex items-center justify-center gap-2">
+                    <svg class="w-3.5 h-3.5 text-[#EE2C3C]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                    </svg>
+                    <span>Send an email to TAs</span>
+                </button>
+
+                <div class="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+                    <button type="button" id="btn-cancel-settings"
+                        class="px-5 py-2 text-xs font-semibold text-white/60 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all">
+                        Cancel
+                    </button>
+                    <button type="button" id="btn-save-settings"
+                        class="px-6 py-2 text-xs font-semibold text-white bg-[#EE2C3C] hover:bg-[#d92231] rounded-xl shadow-lg transition-all shadow-[#EE2C3C]/20 hover:shadow-[#EE2C3C]/40 flex items-center gap-1.5">
+                        <span>Save Configuration</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- MODAL 2: SEND EMAIL TO TAs CONSOLE                                       -->
+    <!-- ========================================================================= -->
+    <div id="modal-email-tas" class="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-3 bg-black/85 backdrop-blur-md hidden transition-opacity duration-300">
+        <div class="relative w-[96vw] max-w-[1400px] h-[92vh] max-h-[94vh] bg-[#0c0c11] border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+            
+            <!-- TOP BAR (Header matching Screenshot 2) -->
+            <div class="flex items-center justify-between px-4 py-2.5 bg-[#0f0f15] border-b border-white/[0.08] flex-shrink-0 gap-3">
+                <!-- Left: DRAFT badge + title preview -->
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[11px] font-bold tracking-wider flex-shrink-0">
+                        <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                        DRAFT
+                    </span>
+                    <span id="draft-top-meta-title" class="text-xs font-semibold text-white/90 truncate max-w-md hidden sm:inline-block" title="Draft Reminder">
+                        TA Reminder Draft Preview
+                    </span>
+                </div>
+
+                <!-- Center: Pagination (< 1 of N > matching Screenshot 2) -->
+                <div class="flex items-center gap-1.5 bg-black/40 border border-white/10 rounded-lg px-2 py-1 flex-shrink-0">
+                    <button type="button" id="btn-prev-ta" onclick="navigateTa(-1)" class="text-white/60 hover:text-white p-0.5 transition-colors" title="Previous TA">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                    </button>
+                    <span id="ta-pagination-indicator" class="text-[11px] font-mono text-white/80 font-bold px-1.5 select-none">1 of 1</span>
+                    <button type="button" id="btn-next-ta" onclick="navigateTa(1)" class="text-white/60 hover:text-white p-0.5 transition-colors" title="Next TA">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    </button>
+                </div>
+
+                <!-- Right: Action Buttons + Close -->
+                <div class="flex items-center gap-2 flex-shrink-0">
+                    <button type="button" id="btn-send-test-email" onclick="sendTestEmailToMe()"
+                        class="px-3 py-1.5 bg-amber-600/80 hover:bg-amber-600 rounded-lg text-xs font-semibold text-white shadow transition-all flex items-center gap-1.5"
+                        title="Sends draft to YOUR inbox with [TEST PREVIEW]">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                        <span id="btn-test-email-text" class="hidden sm:inline">Send Test Email to Me</span>
+                        <span class="sm:hidden">Test</span>
+                    </button>
+                    <button type="button" id="btn-send-single-ta" onclick="sendSingleTaEmail(activeTaIndex, false)"
+                        class="px-3.5 py-1.5 bg-[#EE2C3C] hover:bg-[#d92231] rounded-lg text-xs font-semibold text-white shadow transition-all flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                        </svg>
+                        <span id="btn-send-single-text">Send Email</span>
+                    </button>
+                    <button id="btn-close-email-modal" class="text-white/40 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/5 ml-1" title="Close modal">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- SENDER & RECIPIENT BAR (matching Screenshot 2) -->
+            <div class="px-4 py-2 bg-black/60 border-b border-white/[0.06] flex items-center justify-between text-xs flex-shrink-0 gap-3">
+                <div class="flex items-center gap-2 min-w-0">
+                    <div id="sender-avatar-initial" class="w-6 h-6 rounded-full bg-[#EE2C3C] text-white text-xs font-bold flex items-center justify-center flex-shrink-0 shadow-sm">
+                        O
+                    </div>
+                    <span id="bar-sender-text" class="text-white/80 font-medium truncate">Omkar Jagtap &lt;omkar.jagtap@upgrad.com&gt;</span>
+                    <span class="text-white/30 text-xs">→</span>
+                    <span id="bar-recipient-text" class="text-white font-mono font-semibold truncate">--</span>
+                    <span id="bar-cc-text" class="text-white/40 font-mono text-[11px] truncate hidden md:inline-block"></span>
+                </div>
+                <div class="flex items-center gap-2 flex-shrink-0">
+                    <span id="bar-spoc-tag" class="text-[10px] font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-500/25 px-2 py-0.5 rounded">
+                        SPOC: Omkar
+                    </span>
+                    <span class="text-[10px] text-white/40">Just now</span>
+                </div>
+            </div>
+
+            <!-- COMPACT SEARCH & KPI STRIP (1 line) -->
+            <div class="px-4 py-2 bg-white/[0.02] border-b border-white/[0.06] flex items-center justify-between flex-shrink-0 gap-3">
+                <!-- Search input with presets -->
+                <div class="flex items-center gap-2 flex-grow max-w-2xl">
+                    <div class="relative flex-grow">
+                        <input type="text" id="email-search-course-shell" placeholder="Course Shell (e.g. BUS-940-UC6--Fall-2026, or ALL)"
+                            onkeydown="if(event.key==='Enter') scanCoursePendingQueries()"
+                            class="w-full bg-black/40 border border-white/10 rounded-lg pl-3 pr-2 py-1.5 text-xs text-white placeholder-white/30 focus:outline-none focus:border-[#EE2C3C]/60 font-mono">
+                    </div>
+                    <!-- Presets container (auto-populated with audited course tabs) -->
+                    <div id="email-preset-buttons-container" class="flex items-center gap-1 flex-shrink-0">
+                        <button type="button" onclick="selectEmailPreset('BUS-940-UC6--Fall-2026')" class="text-[10px] font-semibold px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-white/80 hover:text-white border border-white/10 transition-all">
+                            BUS 940
+                        </button>
+                        <button type="button" onclick="selectEmailPreset('BUS-902-UC7--Fall-2026')" class="text-[10px] font-semibold px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-white/80 hover:text-white border border-white/10 transition-all">
+                            BUS 902
+                        </button>
+                        <button type="button" onclick="selectEmailPreset('ALL')" class="text-[10px] font-semibold px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-white/80 hover:text-white border border-white/10 transition-all">
+                            ALL
+                        </button>
+                        <button type="button" onclick="addCustomEmailPreset()" class="text-[10px] font-bold px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-white border border-white/15 transition-all" title="Add another course shell">
+                            +
+                        </button>
+                    </div>
+                    <button type="button" id="btn-scan-course-pending" onclick="scanCoursePendingQueries()"
+                        class="px-3.5 py-1.5 bg-[#EE2C3C] hover:bg-[#d92231] rounded-lg text-xs font-semibold text-white shadow transition-all flex items-center gap-1.5 flex-shrink-0">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        <span id="btn-scan-course-text">Scan</span>
+                    </button>
+                </div>
+
+                <!-- Compact KPI Chips -->
+                <div class="flex items-center gap-2 text-xs flex-shrink-0 font-mono">
+                    <span class="bg-black/30 px-2 py-1 rounded border border-white/5 text-white/70">
+                        Course: <strong id="kpi-scan-course" class="text-white">--</strong>
+                    </span>
+                    <span class="bg-black/30 px-2 py-1 rounded border border-white/5 text-amber-300">
+                        Pending: <strong id="kpi-scan-pending">0</strong>
+                    </span>
+                    <span class="bg-black/30 px-2 py-1 rounded border border-white/5 text-blue-300">
+                        TAs: <strong id="kpi-scan-tas">0</strong>
+                    </span>
+                </div>
+            </div>
+
+            <!-- MAIN CONSOLE BODY (Dual Pane, Flex-1, Zero Page Scroll) -->
+            <div class="p-3 flex-1 min-h-0 flex flex-col overflow-hidden">
+                <!-- Loading State -->
+                <div id="email-scan-loading" class="hidden h-full flex flex-col items-center justify-center text-center">
+                    <div class="w-8 h-8 border-2 border-[#EE2C3C]/20 border-t-[#EE2C3C] rounded-full animate-spin mb-3"></div>
+                    <p class="text-xs font-medium text-white/70">Scanning Google Sheet & ImportData_TA mapping...</p>
+                    <p class="text-[10px] text-white/40 mt-1">Cross-referencing pending learner queries with assigned TAs</p>
+                </div>
+
+                <!-- Empty Initial State -->
+                <div id="email-scan-empty" class="h-full flex flex-col items-center justify-center text-center">
+                    <div class="w-12 h-12 rounded-2xl bg-white/[0.03] border border-white/[0.08] flex items-center justify-center text-white/30 mb-3">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
+                    </div>
+                    <h4 class="text-sm font-semibold text-white/70 mb-1">No Course Scan Active</h4>
+                    <p class="text-xs text-white/40 max-w-sm">Select a course shell preset (BUS 940, BUS 902, or ALL) above and click "Scan" to generate drafts.</p>
+                </div>
+
+                <!-- Results Dual Pane (Full Height, Side-by-Side) -->
+                <div id="email-scan-results" class="hidden h-full flex flex-col lg:flex-row gap-3 min-h-0 overflow-hidden">
+                    <!-- Left Pane: Assigned TAs (width 320px - 384px) -->
+                    <div class="w-full lg:w-80 xl:w-96 flex-shrink-0 flex flex-col h-full overflow-hidden ultra-glass p-3 rounded-xl border border-white/10">
+                        <div class="flex items-center justify-between pb-2 mb-2 border-b border-white/[0.08]">
+                            <span class="text-[11px] font-bold text-white/70 uppercase tracking-wider">Assigned TAs</span>
+                            <span id="ta-count-badge" class="text-[10px] bg-white/10 px-2 py-0.5 rounded-full text-white/80 font-mono">0 TAs</span>
+                        </div>
+                        <div id="ta-roster-list" class="flex-1 overflow-y-auto pr-1 space-y-1.5 custom-scrollbar min-h-0">
+                            <!-- Populated dynamically with ✔ tick badge when sent -->
+                        </div>
+                        <div class="pt-2 mt-2 border-t border-white/[0.08] flex items-center gap-1.5 flex-shrink-0">
+                            <button type="button" id="btn-batch-test-all" onclick="sendAllTaEmailsBatch(true)"
+                                class="flex-1 py-1.5 bg-amber-700/40 hover:bg-amber-700/60 border border-amber-600/30 rounded-lg text-[10px] font-semibold text-amber-300 transition-all text-center"
+                                title="Send test preview of ALL TA drafts to your inbox">
+                                Test All
+                            </button>
+                            <button type="button" id="btn-send-all-tas" onclick="sendAllTaEmailsBatch(false)"
+                                class="flex-1 py-1.5 bg-white/10 hover:bg-white/15 border border-white/10 rounded-lg text-[10px] font-semibold text-white transition-all text-center">
+                                Send All TAs
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Right Pane: Email Preview / Editor (Flex-1, Full Width) -->
+                    <div class="flex-1 flex flex-col h-full overflow-hidden ultra-glass p-3 rounded-xl border border-white/10 min-h-0">
+                        <!-- Top Tabs: Preview vs Edit Mode -->
+                        <div class="flex items-center justify-between pb-2 mb-2 border-b border-white/[0.08] flex-shrink-0">
+                            <div class="flex items-center gap-1 bg-black/40 p-0.5 rounded-lg border border-white/5">
+                                <button type="button" id="btn-tab-preview" onclick="setEmailViewMode('preview')"
+                                    class="px-3 py-1 text-xs font-semibold rounded-lg bg-white/15 text-white shadow-sm transition-all flex items-center gap-1">
+                                    <span>📄 Email Preview</span>
+                                </button>
+                                <button type="button" id="btn-tab-edit" onclick="setEmailViewMode('edit')"
+                                    class="px-3 py-1 text-xs font-semibold rounded-lg text-white/50 hover:text-white/80 transition-all flex items-center gap-1">
+                                    <span>✏ Edit Text / Subject</span>
+                                </button>
+                            </div>
+                            <span id="draft-query-count-badge" class="text-[10px] text-amber-300 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-full font-mono">
+                                0 queries pending
+                            </span>
+                        </div>
+
+                        <!-- Content Container (Scrolls inside itself without outer page scrolling) -->
+                        <div class="flex-1 min-h-0 relative overflow-hidden">
+                            <!-- View 1: Real Corporate Email Preview (matching Screenshot 2) -->
+                            <div id="email-rendered-preview-container"
+                                class="h-full overflow-y-auto bg-white rounded-lg shadow-inner border border-gray-200 p-6 md:p-8 text-gray-900 custom-scrollbar">
+                                <!-- Populated dynamically by selectActiveTa -->
+                            </div>
+
+                            <!-- View 2: Plain Text Editor -->
+                            <div id="email-text-editor-container" class="hidden h-full flex flex-col space-y-2">
+                                <div>
+                                    <label class="block text-[10px] font-semibold text-white/40 uppercase tracking-wider mb-1">Subject</label>
+                                    <input type="text" id="draft-subject-input" class="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#EE2C3C]/50 font-medium">
+                                </div>
+                                <div class="flex-1 min-h-0 flex flex-col">
+                                    <label class="block text-[10px] font-semibold text-white/40 uppercase tracking-wider mb-1">Message Body (Plain Text)</label>
+                                    <textarea id="draft-body-textarea"
+                                        class="w-full flex-1 bg-black/40 border border-white/10 rounded-xl p-3 text-[11px] text-white/90 font-mono leading-relaxed focus:outline-none focus:border-[#EE2C3C]/50 resize-none custom-scrollbar"></textarea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- COMPACT BOTTOM STATUS BAR & COLLAPSIBLE DISPATCH LOG -->
+            <div class="px-4 py-2 bg-[#0a0a0e] border-t border-white/[0.08] flex flex-col flex-shrink-0">
+                <div class="flex items-center justify-between text-xs">
+                    <div id="dispatch-status-indicator" class="flex items-center gap-2 text-white/60 font-mono text-[11px]">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                        <span>Ready for email dispatch</span>
+                    </div>
+                    <button type="button" onclick="toggleDispatchConsole()" class="text-[10px] text-white/40 hover:text-white flex items-center gap-1 font-mono transition-colors">
+                        <span>Terminal Log</span>
+                        <svg id="dispatch-toggle-arrow" class="w-3 h-3 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                </div>
+                <!-- Collapsible Drawer for Terminal Log -->
+                <div id="dispatch-log-drawer" class="hidden mt-2 pt-2 border-t border-white/[0.06]">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-[9px] text-white/40 uppercase tracking-widest font-mono">Live Dispatch Stream</span>
+                        <button type="button" onclick="clearDispatchLog()" class="text-[9px] text-white/30 hover:text-white">Clear</button>
+                    </div>
+                    <div id="dispatch-log-terminal" class="bg-black/60 rounded-lg p-2 text-[10px] font-mono text-white/70 h-20 overflow-y-auto space-y-0.5 custom-scrollbar">
+                        <div class="text-white/40 italic">Ready for email dispatch. Activity logs will appear here...</div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
 </body>
 
 </html>
