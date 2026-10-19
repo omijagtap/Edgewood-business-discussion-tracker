@@ -90,13 +90,13 @@
     </style>
 </head>
 
-<body class="grid-bg min-h-screen relative overflow-y-auto flex flex-col justify-center items-center">
+<body class="grid-bg min-h-screen relative overflow-x-hidden overflow-y-auto text-white">
 
-    <!-- Ultra subtle cool blue ambient glow (not red) -->
-    <div class="ambient-glow"
-        style="top: -10%; right: -10%; width: 500px; height: 500px; opacity: 0.04; background: #3b82f6;"></div>
+    <!-- Ultra subtle cool blue ambient glow (fixed so it never affects layout flow) -->
+    <div class="fixed pointer-events-none rounded-full blur-3xl"
+        style="top: -10%; right: -10%; width: 500px; height: 500px; opacity: 0.04; background: #3b82f6; z-index: 0;"></div>
 
-    <div class="relative z-10 w-full px-4 py-8 max-w-screen-2xl mx-auto">
+    <div class="relative z-10 w-full px-4 pt-4 pb-12 max-w-screen-2xl mx-auto">
 
         <!-- Header / Logo & Navigation -->
         <div class="flex flex-row justify-between items-center w-full mb-8 pl-2 pr-2">
