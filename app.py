@@ -19,6 +19,33 @@ app = Flask(
 )
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'edgewood_secret_key_123')
 
+class VercelPathFix:
+    def __init__(self, wsgi_app):
+        self.wsgi_app = wsgi_app
+
+    def __call__(self, environ, start_response):
+        matched_path = environ.get('HTTP_X_MATCHED_PATH') or environ.get('REQUEST_URI', '')
+        if matched_path and not matched_path.startswith('/app.py') and not matched_path.startswith('/api/index'):
+            clean_path = matched_path.split('?')[0]
+            if clean_path:
+                environ['PATH_INFO'] = clean_path
+
+        path = environ.get('PATH_INFO', '')
+        if path in ('/app.py', '/app', '/api/index', '/api/index.py'):
+            environ['PATH_INFO'] = '/'
+        elif path.startswith('/app.py/'):
+            environ['PATH_INFO'] = '/' + path[8:]
+        elif path.startswith('/app/'):
+            environ['PATH_INFO'] = '/' + path[5:]
+        elif path.startswith('/api/index/'):
+            environ['PATH_INFO'] = '/' + path[11:]
+        elif path.startswith('/api/index.py/'):
+            environ['PATH_INFO'] = '/' + path[14:]
+
+        return self.wsgi_app(environ, start_response)
+
+app.wsgi_app = VercelPathFix(app.wsgi_app)
+
 # Global state for live updates
 task_progress = {}
 task_results = {}
@@ -137,6 +164,9 @@ def run_audit(task_id, course_codes_input):
         current_task_id = None
 
 @app.route('/')
+@app.route('/app.py')
+@app.route('/app')
+@app.route('/api/index')
 def index():
     return render_template('index.html')
 
