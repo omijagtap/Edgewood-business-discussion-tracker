@@ -178,6 +178,94 @@ def api_dashboard():
         original_print(f"Dashboard data fetch failed: {e}")
         return jsonify({"error": str(e)}), 500
 
+import socket
+import smtplib
+import ssl
+
+class IPv4SMTP_SSL(smtplib.SMTP_SSL):
+    """SMTP_SSL client forcing IPv4 (AF_INET) to prevent IPv6 ENETUNREACH [Errno 101] errors in cloud containers."""
+    def _get_socket(self, host, port, timeout):
+        infos = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
+        if not infos:
+            raise OSError(f"Could not resolve IPv4 address for {host}")
+        last_err = None
+        for res in infos:
+            af, socktype, proto, canonname, sa = res
+            s = socket.socket(af, socktype, proto)
+            s.settimeout(timeout)
+            try:
+                s.connect(sa)
+                return self.context.wrap_socket(s, server_hostname=self._host)
+            except OSError as e:
+                last_err = e
+                s.close()
+        if last_err:
+            raise last_err
+        raise OSError(f"Failed to connect to {host}:{port}")
+
+class IPv4SMTP(smtplib.SMTP):
+    """SMTP client forcing IPv4 (AF_INET) for port 587 STARTTLS."""
+    def _get_socket(self, host, port, timeout):
+        infos = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
+        if not infos:
+            raise OSError(f"Could not resolve IPv4 address for {host}")
+        last_err = None
+        for res in infos:
+            af, socktype, proto, canonname, sa = res
+            s = socket.socket(af, socktype, proto)
+            s.settimeout(timeout)
+            try:
+                s.connect(sa)
+                return s
+            except OSError as e:
+                last_err = e
+                s.close()
+        if last_err:
+            raise last_err
+        raise OSError(f"Failed to connect to {host}:{port}")
+
+def get_google_smtp_session(sender_email, app_password, timeout=12):
+    """
+    Connects and logs into Google SMTP with multiple fallback strategies:
+    1. Forces IPv4 (AF_INET) to bypass container IPv6 network unreachable bugs.
+    2. Tries SSL on Port 465 first.
+    3. If Port 465 fails, falls back to Port 587 with STARTTLS.
+    4. Diagnoses cloud firewall blocks (e.g., Render Free Tier blocking outbound SMTP ports 465/587).
+    """
+    context = ssl.create_default_context()
+    first_err = None
+
+    # Strategy 1: Port 465 (SSL)
+    try:
+        server = IPv4SMTP_SSL("smtp.gmail.com", 465, context=context, timeout=timeout)
+        server.login(sender_email, app_password)
+        return server
+    except (smtplib.SMTPAuthenticationError, smtplib.SMTPServerDisconnected):
+        raise
+    except Exception as e:
+        first_err = e
+
+    # Strategy 2: Port 587 (STARTTLS)
+    try:
+        server = IPv4SMTP("smtp.gmail.com", 587, timeout=timeout)
+        server.ehlo()
+        server.starttls(context=context)
+        server.ehlo()
+        server.login(sender_email, app_password)
+        return server
+    except (smtplib.SMTPAuthenticationError, smtplib.SMTPServerDisconnected):
+        raise
+    except Exception as e:
+        err_msg = str(e) or str(first_err) or ""
+        # Check if error is network unreachable or timeout (typical Render free tier block)
+        if any(keyword in err_msg.lower() for keyword in ["101", "unreachable", "timed out", "timeout", "refused", "connection reset"]):
+            raise RuntimeError(
+                "Render Free Tier blocks outbound SMTP ports (465/587) to prevent spam. "
+                "To fix: Upgrade your Render service to 'Starter' ($7/mo) to unlock SMTP, "
+                "or run the tracker locally on your PC (python app.py) where SMTP is fully supported."
+            )
+        raise RuntimeError(f"SMTP connection error: {err_msg}")
+
 @app.route('/api/verify-credentials', methods=['POST'])
 def verify_credentials():
     data = request.json or {}
@@ -186,16 +274,23 @@ def verify_credentials():
     if not sender_email or not app_password:
         return jsonify({"valid": False, "error": "Email and App Password are required."}), 400
 
-    import smtplib, ssl
     try:
-        context = ssl.create_default_context()
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context, timeout=10) as server:
-            server.login(sender_email, app_password)
+        server = get_google_smtp_session(sender_email, app_password, timeout=10)
+        try:
+            server.quit()
+        except Exception:
+            pass
         return jsonify({"valid": True, "message": "Credentials verified via Google SMTP."})
-    except smtplib.SMTPAuthenticationError:
+    except (smtplib.SMTPAuthenticationError, smtplib.SMTPServerDisconnected):
         return jsonify({"valid": False, "error": "Authentication failed. Check your email or 16-character Google App Password."}), 401
     except Exception as e:
-        return jsonify({"valid": False, "error": f"Verification error: {str(e)}"}), 500
+        err_str = str(e)
+        is_cloud_block = "Render" in err_str or "unreachable" in err_str.lower()
+        return jsonify({
+            "valid": False,
+            "error": err_str,
+            "is_cloud_block": is_cloud_block
+        }), 500
 
 @app.route('/api/scan-pending-ta-emails', methods=['POST'])
 def scan_pending_ta_emails():
@@ -229,7 +324,6 @@ def send_ta_email():
     if not to_email:
         return jsonify({"success": False, "error": "Recipient TA email is required."}), 400
 
-    import smtplib, ssl
     from email.mime.multipart import MIMEMultipart
     from email.mime.text import MIMEText
     from email.utils import formataddr
@@ -255,11 +349,13 @@ def send_ta_email():
         if body_html:
             msg.attach(MIMEText(body_html, 'html', 'utf-8'))
 
-        context = ssl.create_default_context()
         recipients = [actual_to] + actual_cc
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context, timeout=15) as server:
-            server.login(sender_email, app_password)
-            server.sendmail(sender_email, recipients, msg.as_string())
+        server = get_google_smtp_session(sender_email, app_password, timeout=15)
+        server.sendmail(sender_email, recipients, msg.as_string())
+        try:
+            server.quit()
+        except Exception:
+            pass
 
         now_str = datetime.now().strftime("%I:%M:%S %p")
         return jsonify({
@@ -271,7 +367,7 @@ def send_ta_email():
             "sent_at": now_str,
             "message": f"[TEST] Email preview sent to {sender_email}" if is_test else f"Email successfully sent to {ta_name} ({to_email})"
         })
-    except smtplib.SMTPAuthenticationError:
+    except (smtplib.SMTPAuthenticationError, smtplib.SMTPServerDisconnected):
         return jsonify({"success": False, "error": "SMTP Authentication failed. Check your App Password."}), 401
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500

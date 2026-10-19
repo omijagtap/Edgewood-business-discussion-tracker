@@ -2320,13 +2320,17 @@
                     feedbackMsg.innerText = '✔ ' + (data.message || 'Credentials verified with Google SMTP!');
                     showToast('SMTP authentication successful!');
                 } else {
-                    feedbackMsg.className = 'text-[11px] text-red-400 font-medium flex items-center gap-1.5';
+                    feedbackMsg.className = 'text-[11px] text-red-400 font-medium flex items-start gap-1.5 leading-snug text-left';
                     feedbackMsg.innerText = '✖ ' + (data.error || 'Authentication failed.');
-                    showToast(data.error || 'Authentication failed', 'error');
+                    if (data.is_cloud_block) {
+                        showToast('Render Free blocks SMTP. Upgrade to Starter or run locally.', 'error');
+                    } else {
+                        showToast(data.error || 'Authentication failed', 'error');
+                    }
                 }
             } catch (err) {
                 feedbackMsg.className = 'text-[11px] text-red-400 font-medium flex items-center gap-1.5';
-                feedbackMsg.innerText = '✖ Network error verifying credentials.';
+                feedbackMsg.innerText = '✖ Network connection error verifying credentials.';
             } finally {
                 btnText.innerText = 'Verify';
             }
@@ -2806,6 +2810,34 @@ ${plainSignature}`;
             </div>`;
         }
 
+        function openActiveTaInGmailWeb() {
+            if (!currentScanData || !currentScanData.ta_groups || !currentScanData.ta_groups[activeTaIndex]) {
+                showToast('Please scan a course first.', 'info');
+                return;
+            }
+            const group = currentScanData.ta_groups[activeTaIndex];
+            const cfg = getEmailSettings();
+            const subjectInput = document.getElementById('draft-subject-input');
+            const subject = subjectInput && subjectInput.value.trim() ? subjectInput.value.trim() : 'Gentle Reminder | Discussion Forum Queries';
+            const textarea = document.getElementById('draft-body-textarea');
+            let bodyText = textarea ? textarea.value.trim() : '';
+
+            const sigName = cfg.full_name || 'Omkar Jagtap';
+            const sigTitle = cfg.job_title || 'Operation Analyst';
+            const sigOffice = cfg.office_address || 'Fleet Building, Andheri - Kurla Rd | Gamdevi, Marol, Naka | Mumbai';
+            const sigPhone = cfg.phone || '+91-9594871400';
+            const sigEmail = cfg.contact_email || cfg.sender_email || 'omkar.jagtap@upgrad.com';
+
+            const signature = `\n\nRegards,\n${sigName}\n${sigTitle}\n${sigOffice}\nm: ${sigPhone}\ne: ${sigEmail} | https://www.upgrad.com/`;
+            const fullBody = bodyText + signature;
+
+            const to = group.ta_email || '';
+            const cc = cfg.cc_emails || '';
+            const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&cc=${encodeURIComponent(cc)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(fullBody)}`;
+            window.open(gmailUrl, '_blank');
+            showToast(`Opened draft in Gmail compose for ${group.ta_name}!`, 'info');
+        }
+
         async function sendSingleTaEmail(idx, isTest = false) {
             if (!currentScanData || !currentScanData.ta_groups || !currentScanData.ta_groups[idx]) return false;
             const group = currentScanData.ta_groups[idx];
@@ -2881,7 +2913,11 @@ ${plainSignature}`;
                     return true;
                 } else {
                     appendDispatchLog(`[${new Date().toLocaleTimeString()}] ✖ FAILED for ${group.ta_email}: ${data.error}`);
-                    showToast(`Failed: ${data.error}`, 'error');
+                    if (data.error && (data.error.includes('Render') || data.error.includes('unreachable') || data.error.includes('blocked'))) {
+                        showToast('Render Free blocks SMTP. Click "Open in Gmail" button above to send directly!', 'error');
+                    } else {
+                        showToast(`Failed: ${data.error}`, 'error');
+                    }
                     updateStatusBar(`Failed: ${data.error}`, 'error');
                     return false;
                 }
@@ -3137,6 +3173,12 @@ ${plainSignature}`;
                         <span class="text-blue-400 font-bold text-xs mt-0.5">ℹ</span>
                         <span><strong>App Password:</strong> The App Password is saved locally in your browser to avoid re-entering it. If you clear your browser cookies/caches, this password will be reset.</span>
                     </div>
+
+                    <!-- Cloud Hosting Clarification -->
+                    <div class="p-2.5 bg-amber-500/[0.08] border border-amber-500/20 rounded-xl text-[10.5px] text-amber-200/90 leading-relaxed flex items-start gap-2">
+                        <span class="text-amber-400 font-bold text-xs mt-0.5">⚡</span>
+                        <span><strong>Render Cloud Hosting Note:</strong> Render Free Tier blocks outbound SMTP ports (465/587). To verify and send via background SMTP, upgrade to Render Starter ($7/mo) or run locally on your PC (<code>python app.py</code>). You can also click <strong>"Open in Gmail"</strong> in the email console to dispatch drafts instantly in your browser!</span>
+                    </div>
                 </div>
 
                 <!-- Right Panel: EMAIL SIGNATURE DETAILS -->
@@ -3241,6 +3283,15 @@ ${plainSignature}`;
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                         <span id="btn-test-email-text" class="hidden sm:inline">Send Test Email to Me</span>
                         <span class="sm:hidden">Test</span>
+                    </button>
+                    <button type="button" id="btn-open-gmail-web" onclick="openActiveTaInGmailWeb()"
+                        class="px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/15 rounded-lg text-xs font-semibold text-white/90 hover:text-white transition-all flex items-center gap-1.5"
+                        title="Open this email pre-filled directly in Gmail compose (works anywhere without needing SMTP server)">
+                        <svg class="w-3.5 h-3.5 text-red-400" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.272H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L12 9.491l8.073-5.998C21.69 2.28 24 3.434 24 5.457z"/>
+                        </svg>
+                        <span class="hidden sm:inline">Open in Gmail</span>
+                        <span class="sm:hidden">Gmail</span>
                     </button>
                     <button type="button" id="btn-send-single-ta" onclick="sendSingleTaEmail(activeTaIndex, false)"
                         class="px-3.5 py-1.5 bg-[#EE2C3C] hover:bg-[#d92231] rounded-lg text-xs font-semibold text-white shadow transition-all flex items-center gap-1.5">
