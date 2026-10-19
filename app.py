@@ -24,23 +24,18 @@ class VercelPathFix:
         self.wsgi_app = wsgi_app
 
     def __call__(self, environ, start_response):
-        matched_path = environ.get('HTTP_X_MATCHED_PATH') or environ.get('REQUEST_URI', '')
-        if matched_path and not matched_path.startswith('/app.py') and not matched_path.startswith('/api/index'):
-            clean_path = matched_path.split('?')[0]
-            if clean_path:
-                environ['PATH_INFO'] = clean_path
-
-        path = environ.get('PATH_INFO', '')
-        if path in ('/app.py', '/app', '/api/index', '/api/index.py'):
-            environ['PATH_INFO'] = '/'
-        elif path.startswith('/app.py/'):
-            environ['PATH_INFO'] = '/' + path[8:]
-        elif path.startswith('/app/'):
-            environ['PATH_INFO'] = '/' + path[5:]
-        elif path.startswith('/api/index/'):
-            environ['PATH_INFO'] = '/' + path[11:]
-        elif path.startswith('/api/index.py/'):
-            environ['PATH_INFO'] = '/' + path[14:]
+        raw_uri = environ.get('RAW_URI') or environ.get('REQUEST_URI') or ''
+        clean_uri = raw_uri.split('?')[0] if raw_uri else ''
+        if clean_uri and not clean_uri.startswith('/api/index') and not clean_uri.startswith('/app.py'):
+            environ['PATH_INFO'] = clean_uri
+        else:
+            path = environ.get('PATH_INFO', '')
+            if path in ('/api/index', '/api/index.py', '/app.py', '/app'):
+                environ['PATH_INFO'] = '/'
+            elif path.startswith('/api/index/'):
+                environ['PATH_INFO'] = '/' + path[11:]
+            elif path.startswith('/app.py/'):
+                environ['PATH_INFO'] = '/' + path[8:]
 
         return self.wsgi_app(environ, start_response)
 
@@ -50,6 +45,16 @@ app.wsgi_app = VercelPathFix(app.wsgi_app)
 task_progress = {}
 task_results = {}
 current_task_id = None
+
+def update_task_progress(task_id, message):
+    if not task_id:
+        return
+    task_progress[task_id] = message
+    try:
+        with open(os.path.join('/tmp', f"task_{task_id}.txt"), 'w') as f:
+            f.write(message)
+    except Exception:
+        pass
 
 # Intercept print to stream live updates natively
 original_print = builtins.print
@@ -67,7 +72,7 @@ def custom_print(*args, **kwargs):
             
         # Ignore empty lines or simple separators
         if not set(clean_text).issubset({'-', '=', ' '}):
-            task_progress[current_task_id] = clean_text
+            update_task_progress(current_task_id, clean_text)
             
     original_print(*args, **kwargs)
 
@@ -76,7 +81,7 @@ builtins.print = custom_print
 def run_audit(task_id, course_codes_input):
     global current_task_id
     current_task_id = task_id
-    task_progress[task_id] = "Initializing Canvas API Connection..."
+    update_task_progress(task_id, "Initializing Canvas API Connection...")
     
     try:
         if "," in course_codes_input:
@@ -85,15 +90,15 @@ def run_audit(task_id, course_codes_input):
             sis_ids = [s.strip() for s in course_codes_input.split() if s.strip()]
 
         if not sis_ids:
-            task_progress[task_id] = "ERROR: No valid SIS IDs found in input."
+            update_task_progress(task_id, "ERROR: No valid SIS IDs found in input.")
             return
 
         if not da.check_connection():
-            task_progress[task_id] = "ERROR: API connection failed. Check your token."
+            update_task_progress(task_id, "ERROR: API connection failed. Check your token.")
             return
 
         # Fetch latest TA directory from Google Sheet to ensure new TAs are immediately active
-        task_progress[task_id] = "Syncing Active TA Directory from Google Sheet..."
+        update_task_progress(task_id, "Syncing Active TA Directory from Google Sheet...")
         sheets_helper.get_import_data_ta(force_refresh=True)
 
         wb = openpyxl.Workbook()
@@ -103,15 +108,15 @@ def run_audit(task_id, course_codes_input):
             # Business Tracker specific filter
             clean_sis = sis_id.strip()
             if not clean_sis.upper().startswith("BUS"):
-                task_progress[task_id] = f"Skipping {sis_id} (Not a Business course)."
+                update_task_progress(task_id, f"Skipping {sis_id} (Not a Business course).")
                 time.sleep(1)
                 continue
             sis_id = clean_sis
 
-            task_progress[task_id] = f"Locating Course: {sis_id}..."
+            update_task_progress(task_id, f"Locating Course: {sis_id}...")
             course = da.find_course(sis_id)
             if not course:
-                task_progress[task_id] = f"Could not find Course: {sis_id}. Skipping..."
+                update_task_progress(task_id, f"Could not find Course: {sis_id}. Skipping...")
                 time.sleep(1)
                 continue
                 
@@ -124,14 +129,14 @@ def run_audit(task_id, course_codes_input):
             has_real_data = any(r.get("Learner Name") not in ("(No student posts yet)", "N/A", "Unknown", "User#None", "") for r in flat_rows)
 
             if not flat_rows or not has_real_data:
-                task_progress[task_id] = f"No discussions found in {sis_id}. Skipping..."
+                update_task_progress(task_id, f"No discussions found in {sis_id}. Skipping...")
                 time.sleep(1)
                 continue
 
-            task_progress[task_id] = "Compiling Data into Excel Structure..."
+            update_task_progress(task_id, "Compiling Data into Excel Structure...")
             da.build_excel_sheet(wb, flat_rows, sis_id, course_name)
             try:
-                task_progress[task_id] = "Syncing Report to Google Sheet Database..."
+                update_task_progress(task_id, "Syncing Report to Google Sheet Database...")
                 sheets_helper.push_to_google_sheet(flat_rows, sis_id, course_name)
                 # Bust the dashboard cache so next fetch reflects new audit data
                 sheets_helper._dashboard_cache["data"] = None
@@ -140,13 +145,13 @@ def run_audit(task_id, course_codes_input):
             processed_count += 1
 
         if processed_count == 0:
-            task_progress[task_id] = "ERROR: No student discussions found in any course."
+            update_task_progress(task_id, "ERROR: No student discussions found in any course.")
             return
 
         if "Sheet" in wb.sheetnames and len(wb.sheetnames) > 1:
             del wb["Sheet"]
 
-        task_progress[task_id] = "Finalizing Output File..."
+        update_task_progress(task_id, "Finalizing Output File...")
         output = io.BytesIO()
         wb.save(output)
         output.seek(0)
@@ -155,11 +160,16 @@ def run_audit(task_id, course_codes_input):
             "file": output,
             "filename": f"MultiCourse_Discussion_Audit_{sis_ids[0].replace(' ', '_')}.xlsx"
         }
+        try:
+            with open(os.path.join('/tmp', f"task_{task_id}.xlsx"), 'wb') as f:
+                f.write(output.getvalue())
+        except Exception:
+            pass
         
         time.sleep(0.5) # Slight pause to let UI catch up
-        task_progress[task_id] = "COMPLETE"
+        update_task_progress(task_id, "COMPLETE")
     except Exception as e:
-        task_progress[task_id] = f"ERROR: {str(e)}"
+        update_task_progress(task_id, f"ERROR: {str(e)}")
     finally:
         current_task_id = None
 
@@ -172,13 +182,13 @@ def index():
 
 @app.route('/start', methods=['POST'])
 def start_audit():
-    data = request.json
+    data = request.json or {}
     course_codes_input = data.get('course_codes', '')
     if not course_codes_input:
         return jsonify({"error": "Please enter at least one course code."}), 400
         
     task_id = str(uuid.uuid4())
-    task_progress[task_id] = "Warming up Audit Engine..."
+    update_task_progress(task_id, "Warming up Audit Engine...")
     
     # Run the scraping in a background thread
     thread = threading.Thread(target=run_audit, args=(task_id, course_codes_input))
@@ -188,17 +198,36 @@ def start_audit():
 
 @app.route('/status/<task_id>')
 def status(task_id):
-    state = task_progress.get(task_id, "Unknown Task")
+    state = task_progress.get(task_id)
+    if not state:
+        tmp_status = os.path.join('/tmp', f"task_{task_id}.txt")
+        if os.path.exists(tmp_status):
+            try:
+                with open(tmp_status, 'r') as f:
+                    state = f.read().strip()
+            except Exception:
+                pass
+    if not state:
+        state = "Warming up Audit Engine..."
     return jsonify({"status": state})
 
 @app.route('/download/<task_id>')
 def download(task_id):
     if task_id in task_results:
         res = task_results[task_id]
+        res["file"].seek(0)
         return send_file(
             res["file"],
             as_attachment=True,
             download_name=res["filename"],
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    tmp_path = os.path.join('/tmp', f"task_{task_id}.xlsx")
+    if os.path.exists(tmp_path):
+        return send_file(
+            tmp_path,
+            as_attachment=True,
+            download_name=f"Discussion_Audit_{task_id[:8]}.xlsx",
             mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
     return "File not found or expired.", 404
