@@ -5,6 +5,7 @@ import time
 import uuid
 import threading
 import builtins
+import urllib.parse
 from datetime import datetime
 import openpyxl
 from flask import Flask, render_template, request, send_file, jsonify, redirect, url_for
@@ -24,6 +25,17 @@ class VercelPathFix:
         self.wsgi_app = wsgi_app
 
     def __call__(self, environ, start_response):
+        # 1. Check if Vercel rewrite forwarded the original path via query string
+        qs = environ.get('QUERY_STRING', '')
+        if '__path__' in qs:
+            params = urllib.parse.parse_qs(qs, keep_blank_values=True)
+            if '__path__' in params:
+                raw_path = params.pop('__path__')[0]
+                clean_path = ('/' + raw_path.lstrip('/')) if raw_path else '/'
+                environ['PATH_INFO'] = clean_path
+                environ['QUERY_STRING'] = urllib.parse.urlencode(params, doseq=True)
+
+        # 2. Check RAW_URI / REQUEST_URI / HTTP_X_MATCHED_PATH
         raw_uri = environ.get('RAW_URI') or environ.get('REQUEST_URI') or ''
         clean_uri = raw_uri.split('?')[0] if raw_uri else ''
         if clean_uri and not clean_uri.startswith('/api/index') and not clean_uri.startswith('/app.py'):
@@ -173,16 +185,29 @@ def run_audit(task_id, course_codes_input):
     finally:
         current_task_id = None
 
-@app.route('/')
-@app.route('/app.py')
-@app.route('/app')
-@app.route('/api/index')
+@app.route('/', methods=['GET', 'POST'])
+@app.route('/app.py', methods=['GET', 'POST'])
+@app.route('/app', methods=['GET', 'POST'])
+@app.route('/api/index', methods=['GET', 'POST'])
+@app.route('/api/index.py', methods=['GET', 'POST'])
 def index():
+    if request.method == 'POST':
+        data = request.get_json(silent=True) or {}
+        if 'course_codes' in data:
+            return start_audit()
+        if 'course_shell' in data:
+            return scan_pending_ta_emails()
+        if 'sender_email' in data and 'to_email' in data:
+            return send_ta_email()
+        if 'sender_email' in data and 'app_password' in data:
+            return verify_credentials()
     return render_template('index.html')
 
-@app.route('/start', methods=['POST'])
+@app.route('/start', methods=['GET', 'POST'])
+@app.route('/api/start', methods=['GET', 'POST'])
+@app.route('/api/index/start', methods=['GET', 'POST'])
 def start_audit():
-    data = request.json or {}
+    data = request.get_json(silent=True) or {}
     course_codes_input = data.get('course_codes', '')
     if not course_codes_input:
         return jsonify({"error": "Please enter at least one course code."}), 400
@@ -197,6 +222,8 @@ def start_audit():
     return jsonify({"task_id": task_id})
 
 @app.route('/status/<task_id>')
+@app.route('/api/status/<task_id>')
+@app.route('/api/index/status/<task_id>')
 def status(task_id):
     state = task_progress.get(task_id)
     if not state:
@@ -212,6 +239,8 @@ def status(task_id):
     return jsonify({"status": state})
 
 @app.route('/download/<task_id>')
+@app.route('/api/download/<task_id>')
+@app.route('/api/index/download/<task_id>')
 def download(task_id):
     if task_id in task_results:
         res = task_results[task_id]
@@ -233,6 +262,9 @@ def download(task_id):
     return "File not found or expired.", 404
 
 @app.route('/api/dashboard')
+@app.route('/dashboard')
+@app.route('/api/index/api/dashboard')
+@app.route('/api/index/dashboard')
 def api_dashboard():
     try:
         force_refresh = request.args.get('refresh', 'false').lower() == 'true'
@@ -331,6 +363,8 @@ def get_google_smtp_session(sender_email, app_password, timeout=12):
         raise RuntimeError(f"SMTP connection error: {err_msg}")
 
 @app.route('/api/verify-credentials', methods=['POST'])
+@app.route('/api/index/api/verify-credentials', methods=['POST'])
+@app.route('/api/index/verify-credentials', methods=['POST'])
 def verify_credentials():
     data = request.json or {}
     sender_email = (data.get('sender_email') or '').strip()
@@ -357,6 +391,8 @@ def verify_credentials():
         }), 500
 
 @app.route('/api/scan-pending-ta-emails', methods=['POST'])
+@app.route('/api/index/api/scan-pending-ta-emails', methods=['POST'])
+@app.route('/api/index/scan-pending-ta-emails', methods=['POST'])
 def scan_pending_ta_emails():
     data = request.json or {}
     course_shell = (data.get('course_shell') or '').strip()
@@ -371,6 +407,8 @@ def scan_pending_ta_emails():
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/send-ta-email', methods=['POST'])
+@app.route('/api/index/api/send-ta-email', methods=['POST'])
+@app.route('/api/index/send-ta-email', methods=['POST'])
 def send_ta_email():
     data = request.json or {}
     sender_email  = (data.get('sender_email') or '').strip()
