@@ -2649,6 +2649,8 @@
                 return `${n} | ${c} | ${ln} | ${em} | ${tp} | ${dt}`;
             }).join('\n');
 
+            const graderNoteText = `Note: If grader intervention is not required for a specific query, please add a standard response such as “Grader intervention not required” or “Acknowledged.” Since the system automatically flags all unanswered queries, this will ensure that such queries are correctly marked as reviewed.`;
+
             // Discussion Summary is placed at the TOP right after the introductory reminder
             const bodyText = `${taSalutation}
 
@@ -2666,7 +2668,11 @@ ${tableDivider}
 ${tableRows}
 ${tableDivider}
 
-${plainSignature}`;
+${graderNoteText}
+
+${plainSignature}
+
+This is an auto-generated email.`;
 
             const textarea = document.getElementById('draft-body-textarea');
             if (textarea) textarea.value = bodyText;
@@ -2798,6 +2804,11 @@ ${plainSignature}`;
                 </tbody>
               </table>
 
+              <!-- Grader Intervention Note -->
+              <p style="margin: 18px 0 20px 0; font-size: 12.5px; line-height: 1.6; color: #374151;">
+                <strong>Note:</strong> If grader intervention is not required for a specific query, please add a standard response such as “Grader intervention not required” or “Acknowledged.” Since the system automatically flags all unanswered queries, this will ensure that such queries are correctly marked as reviewed.
+              </p>
+
               <!-- Exact Signature from Screenshot 1 -->
               <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 13px; color: #1e293b; line-height: 1.5; margin-top: 24px; padding-top: 14px; border-top: 1px solid #f1f5f9;">
                 <p style="margin: 0 0 2px 0;">Regards,</p>
@@ -2813,6 +2824,13 @@ ${plainSignature}`;
                   <a href="https://twitter.com/upGrad_edu" target="_blank" style="color: #2563eb; text-decoration: underline;">Twitter</a> | 
                   <a href="https://www.linkedin.com/company/upgrad/" target="_blank" style="color: #2563eb; text-decoration: underline;">LinkedIn</a> | 
                   <a href="https://www.youtube.com/channel/UCyv2qPz6Q5rX8yN277mO6_Q" target="_blank" style="color: #2563eb; text-decoration: underline;">YouTube</a>
+                </p>
+              </div>
+
+              <!-- Footer: Auto-Generated Email Notice (Centered, Light Font) -->
+              <div style="margin-top: 28px; padding-top: 14px; border-top: 1px solid #f1f5f9; text-align: center;">
+                <p style="margin: 0; font-size: 11px; color: #94a3b8; font-style: italic; letter-spacing: 0.3px;">
+                  This is an auto-generated email.
                 </p>
               </div>
 
@@ -2837,8 +2855,8 @@ ${plainSignature}`;
             const sigPhone = cfg.phone || '+91-9594871400';
             const sigEmail = cfg.contact_email || cfg.sender_email || 'omkar.jagtap@upgrad.com';
 
-            const signature = `\n\nRegards,\n${sigName}\n${sigTitle}\n${sigOffice}\nm: ${sigPhone}\ne: ${sigEmail} | https://www.upgrad.com/`;
-            const fullBody = bodyText + signature;
+            const signature = `\n\nRegards,\n${sigName}\n${sigTitle}\n${sigOffice}\nm: ${sigPhone}\ne: ${sigEmail} | https://www.upgrad.com/\n\nThis is an auto-generated email.`;
+            const fullBody = bodyText.includes('Regards,') ? bodyText : (bodyText + signature);
 
             const to = group.ta_email || '';
             const cc = cfg.cc_emails || '';
