@@ -2577,10 +2577,12 @@
 
             // TA name helpers: extract last name for academic salutation
             const taFullName = group.ta_name.trim();
+            const taHasProf = /^(Prof\.|Professor)/i.test(taFullName);
             const taCleanName = taFullName.replace(/^(Dr\.|Doctor|Prof\.|Professor)\s+/i, '').trim();
             const taNameParts = taCleanName.split(/\s+/);
             const taLastName = taNameParts.length > 1 ? taNameParts[taNameParts.length - 1] : taNameParts[0];
-            const taSalutation = `Dear Dr. ${taLastName},`;
+            const taTitlePrefix = taHasProf ? 'Professor' : 'Dr.';
+            const taSalutation = `Dear ${taTitlePrefix} ${taLastName},`;
             const courseShellLabel = currentScanData.course_shell || currentScanData.course_code || '';
             const multiCourse = currentScanData.course_shells_scanned && currentScanData.course_shells_scanned.length > 1;
             const courseDisplay = multiCourse
@@ -2622,16 +2624,14 @@
                 sumTblBottom
             ].join('\n');
 
-            // Plain text signature
+            // Plain text signature (uniform line spacing without blank space lines)
             const plainSignature = [
                 'Regards,',
                 cfg.full_name || 'Omkar Jagtap',
                 cfg.job_title || 'Operation Analyst',
-                '',
                 cfg.office_address || 'Fleet Building, Andheri - Kurla Rd | Gamdevi, Marol, Naka | Mumbai MH 400059',
                 `m ${cfg.phone || '+91-9594871400'} |`,
-                '',
-                `e ${cfg.contact_email || 'omkar.jagtap@upgrad.com'}| https://www.upgrad.com/`,
+                `e ${cfg.contact_email || 'omkar.jagtap@upgrad.com'} | https://www.upgrad.com/`,
                 'Follow us: Facebook | Twitter | LinkedIn | YouTube'
             ].join('\n');
 
@@ -2711,7 +2711,7 @@ This is an auto-generated email.`;
                 return `
                 <tr style="background: #ffffff; border-bottom: 1px solid #e5e7eb; text-align: center;">
                     <td style="padding: 7px 10px; font-size: 12px; color: #6b7280; font-weight: 600; text-align: center; border-right: 1px solid #e5e7eb; width: 30px;">${idx + 1}</td>
-                    <td style="padding: 7px 10px; font-size: 12px; font-weight: 600; color: #1e40af; border-right: 1px solid #e5e7eb; text-align: center; white-space: nowrap;">${course}</td>
+                    <td style="padding: 7px 10px; font-size: 12px; font-weight: normal; color: #1e40af; border-right: 1px solid #e5e7eb; text-align: center; white-space: nowrap;">${course}</td>
                     <td style="padding: 7px 10px; font-size: 13px; font-weight: 600; color: #111827; border-right: 1px solid #e5e7eb; text-align: center;">${q.learner_name}</td>
                     <td style="padding: 7px 10px; font-size: 12px; color: #2563eb; border-right: 1px solid #e5e7eb; text-align: center;"><a href="mailto:${q.learner_email}" style="color: #2563eb; text-decoration: underline;">${q.learner_email}</a></td>
                     <td style="padding: 7px 10px; font-size: 12px; color: #374151; border-right: 1px solid #e5e7eb; text-align: center;">${q.topic}</td>
@@ -2728,6 +2728,8 @@ This is an auto-generated email.`;
             const contactEmail = cfg.contact_email || 'omkar.jagtap@upgrad.com';
 
             // Compute last name for salutation inside buildHtmlBody
+            const bHasProf = /^(Prof\.|Professor)/i.test(group.ta_name.trim());
+            const bTitlePrefix = bHasProf ? 'Professor' : 'Dr.';
             const bCleanName = group.ta_name.trim().replace(/^(Dr\.|Doctor|Prof\.|Professor)\s+/i, '').trim();
             const bNameParts = bCleanName.split(/\s+/);
             const bLastName = bNameParts.length > 1 ? bNameParts[bNameParts.length - 1] : bNameParts[0];
@@ -2735,13 +2737,12 @@ This is an auto-generated email.`;
             return `
             <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 13px; color: #1e293b; line-height: 1.6; margin: 0; padding: 0; background: #ffffff; text-align: left;">
 
-              <p style="margin: 0 0 14px 0; font-size: 14px; color: #111827;">Dear <strong>Dr. ${bLastName}</strong>,</p>
+              <p style="margin: 0 0 14px 0; font-size: 14px; color: #111827;">Dear ${bTitlePrefix} ${bLastName},</p>
 
               <p style="margin: 0 0 14px 0; font-size: 13px; color: #374151;">I hope you are doing well.</p>
 
               <p style="margin: 0 0 16px 0; font-size: 13px; color: #374151; line-height: 1.6;">
-                This is a general reminder that the following learners assigned to you have raised queries on the Discussion Board for the course
-                <strong>${courseDisplay}</strong>, and currently have pending queries awaiting a response on the Canvas Discussion Board.
+                This is a general reminder that the following learners assigned to you have raised queries on the Discussion Board for the course ${courseDisplay}, and currently have pending queries awaiting a response on the Canvas Discussion Board.
               </p>
 
               <!-- Discussion Summary Table (At the top, Center Aligned, No TA repetition) -->
@@ -2809,16 +2810,14 @@ This is an auto-generated email.`;
                 <strong>Note:</strong> If grader intervention is not required for a specific query, please add a standard response such as “Grader intervention not required” or “Acknowledged.” Since the system automatically flags all unanswered queries, this will ensure that such queries are correctly marked as reviewed.
               </p>
 
-              <!-- Exact Signature from Screenshot 1 -->
+              <!-- Signature (Uniform Spacing without Space Lines) -->
               <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 13px; color: #1e293b; line-height: 1.5; margin-top: 24px; padding-top: 14px; border-top: 1px solid #f1f5f9;">
                 <p style="margin: 0 0 2px 0;">Regards,</p>
-                <p style="margin: 0; font-size: 14px; font-weight: 700; color: #0f172a;">${fullName}</p>
-                <p style="margin: 0 0 16px 0; font-size: 13px; color: #475569;">${jobTitle}</p>
-
-                <p style="margin: 0 0 4px 0; font-size: 12px; color: #334155;">${officeAddress}</p>
-                <p style="margin: 0 0 16px 0; font-size: 12px; color: #334155;"><strong>m</strong> <a href="tel:${cleanPhone}" style="color: #2563eb; text-decoration: underline;">${phone}</a> |</p>
-
-                <p style="margin: 0 0 4px 0; font-size: 12px; color: #334155;"><strong>e</strong> <a href="mailto:${contactEmail}" style="color: #2563eb; text-decoration: underline;">${contactEmail}</a>| <a href="https://www.upgrad.com/" target="_blank" style="color: #2563eb; text-decoration: underline;">https://www.upgrad.com/</a></p>
+                <p style="margin: 0 0 2px 0; font-size: 14px; font-weight: 700; color: #0f172a;">${fullName}</p>
+                <p style="margin: 0 0 2px 0; font-size: 13px; color: #475569;">${jobTitle}</p>
+                <p style="margin: 0 0 2px 0; font-size: 12px; color: #334155;">${officeAddress}</p>
+                <p style="margin: 0 0 2px 0; font-size: 12px; color: #334155;"><strong>m</strong> <a href="tel:${cleanPhone}" style="color: #2563eb; text-decoration: underline;">${phone}</a> |</p>
+                <p style="margin: 0 0 2px 0; font-size: 12px; color: #334155;"><strong>e</strong> <a href="mailto:${contactEmail}" style="color: #2563eb; text-decoration: underline;">${contactEmail}</a> | <a href="https://www.upgrad.com/" target="_blank" style="color: #2563eb; text-decoration: underline;">https://www.upgrad.com/</a></p>
                 <p style="margin: 0; font-size: 12px; color: #334155;"><strong>Follow us:</strong> 
                   <a href="https://www.facebook.com/upGradGlobal/" target="_blank" style="color: #2563eb; text-decoration: underline;">Facebook</a> | 
                   <a href="https://twitter.com/upGrad_edu" target="_blank" style="color: #2563eb; text-decoration: underline;">Twitter</a> | 
@@ -2851,11 +2850,11 @@ This is an auto-generated email.`;
 
             const sigName = cfg.full_name || 'Omkar Jagtap';
             const sigTitle = cfg.job_title || 'Operation Analyst';
-            const sigOffice = cfg.office_address || 'Fleet Building, Andheri - Kurla Rd | Gamdevi, Marol, Naka | Mumbai';
+            const sigOffice = cfg.office_address || 'Fleet Building, Andheri - Kurla Rd | Gamdevi, Marol, Naka | Mumbai MH 400059';
             const sigPhone = cfg.phone || '+91-9594871400';
             const sigEmail = cfg.contact_email || cfg.sender_email || 'omkar.jagtap@upgrad.com';
 
-            const signature = `\n\nRegards,\n${sigName}\n${sigTitle}\n${sigOffice}\nm: ${sigPhone}\ne: ${sigEmail} | https://www.upgrad.com/\n\nThis is an auto-generated email.`;
+            const signature = `\n\nRegards,\n${sigName}\n${sigTitle}\n${sigOffice}\nm ${sigPhone} |\ne ${sigEmail} | https://www.upgrad.com/\nFollow us: Facebook | Twitter | LinkedIn | YouTube\n\nThis is an auto-generated email.`;
             const fullBody = bodyText.includes('Regards,') ? bodyText : (bodyText + signature);
 
             const to = group.ta_email || '';
