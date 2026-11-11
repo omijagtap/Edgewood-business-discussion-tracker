@@ -392,6 +392,27 @@
                         </select>
                     </div>
                     
+                    <!-- Date Filter -->
+                    <div class="h-9 flex items-center gap-1.5 bg-white/[0.02] border border-white/[0.08] rounded-xl px-2.5">
+                        <span class="text-[9px] font-semibold text-white/40 uppercase tracking-wider font-mono">Date:</span>
+                        <select id="filter-date-preset" onchange="onDashDatePresetChanged(this.value)"
+                            class="bg-transparent text-white text-xs font-semibold focus:outline-none cursor-pointer py-1">
+                            <option value="all" class="bg-[#050505] text-white">All Time</option>
+                            <option value="today" class="bg-[#050505] text-white">Today</option>
+                            <option value="7days" class="bg-[#050505] text-white">Last 7 Days</option>
+                            <option value="14days" class="bg-[#050505] text-white">Last 14 Days</option>
+                            <option value="30days" class="bg-[#050505] text-white">Last 30 Days</option>
+                            <option value="custom" class="bg-[#050505] text-white">Custom Range...</option>
+                        </select>
+                    </div>
+
+                    <!-- Custom Date Picker Container -->
+                    <div id="dash-custom-date-container" class="hidden h-9 flex items-center gap-1 bg-white/[0.02] border border-white/[0.08] rounded-xl px-2">
+                        <input type="date" id="dash-filter-date-from" onchange="applyFiltersAndRender()" class="bg-transparent text-[11px] text-white font-mono focus:outline-none" title="Start Date">
+                        <span class="text-white/30 text-[10px]">to</span>
+                        <input type="date" id="dash-filter-date-to" onchange="applyFiltersAndRender()" class="bg-transparent text-[11px] text-white font-mono focus:outline-none" title="End Date">
+                    </div>
+
                     <!-- Custom Course Filter Input -->
                     <div class="h-9 flex items-center gap-1.5 bg-white/[0.02] border border-white/[0.08] rounded-xl px-2.5">
                         <span class="text-[9px] font-semibold text-white/40 uppercase tracking-wider font-mono">Custom Course:</span>
@@ -885,10 +906,45 @@
             }
         }
 
+        // Helper: Date range check supporting ISO string or formatted date string
+        function isDateInRange(dtIso, dtStr, fromDate, toDate) {
+            if (!fromDate && !toDate) return true;
+            let ts = NaN;
+            if (dtIso) {
+                ts = Date.parse(dtIso);
+            }
+            if (isNaN(ts) && dtStr) {
+                const parsed = Date.parse(dtStr);
+                if (!isNaN(parsed)) ts = parsed;
+            }
+            if (isNaN(ts)) return true; // keep if date unparseable
+            if (fromDate) {
+                const fromTs = new Date(fromDate).setHours(0, 0, 0, 0);
+                if (ts < fromTs) return false;
+            }
+            if (toDate) {
+                const toTs = new Date(toDate).setHours(23, 59, 59, 999);
+                if (ts > toTs) return false;
+            }
+            return true;
+        }
+
+        function onDashDatePresetChanged(val) {
+            const customContainer = document.getElementById('dash-custom-date-container');
+            if (customContainer) {
+                if (val === 'custom') {
+                    customContainer.classList.remove('hidden');
+                } else {
+                    customContainer.classList.add('hidden');
+                }
+            }
+            applyFiltersAndRender();
+        }
+
         // Main filter & render compiler
         function applyFiltersAndRender() {
-            const cohortVal = document.getElementById('filter-cohort').value;
-            const courseVal = document.getElementById('filter-course').value;
+            const cohortVal = document.getElementById('filter-cohort')?.value || 'All';
+            const courseVal = document.getElementById('filter-course')?.value || 'All';
 
             // Filter queries
             let filtered = window.allQueries;
@@ -897,6 +953,29 @@
             }
             if (courseVal !== "All") {
                 filtered = filtered.filter(q => q.course_name === courseVal);
+            }
+
+            // Apply Date Filter
+            const datePreset = document.getElementById('filter-date-preset')?.value || 'all';
+            let fromDate = null;
+            let toDate = null;
+            const now = new Date();
+            if (datePreset === 'today') {
+                fromDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            } else if (datePreset === '7days') {
+                fromDate = new Date(now.getTime() - 7 * 86400000);
+            } else if (datePreset === '14days') {
+                fromDate = new Date(now.getTime() - 14 * 86400000);
+            } else if (datePreset === '30days') {
+                fromDate = new Date(now.getTime() - 30 * 86400000);
+            } else if (datePreset === 'custom') {
+                const fVal = document.getElementById('dash-filter-date-from')?.value;
+                const tVal = document.getElementById('dash-filter-date-to')?.value;
+                if (fVal) fromDate = new Date(fVal);
+                if (tVal) toDate = new Date(tVal);
+            }
+            if (fromDate || toDate) {
+                filtered = filtered.filter(q => isDateInRange(q.created_dt_iso, q.created_on, fromDate, toDate));
             }
 
             // Apply custom course filter if active
@@ -1096,7 +1175,7 @@
             // Build TA map from replied queries
             const taMap = {};
             queries.forEach(q => {
-                const taName = q.first_responder;
+                const taName = q.first_responder || q.assigned_ta_name;
                 if (!taName || taName === "N/A" || q.replied !== "Yes") return;
                 if (!taMap[taName]) {
                     taMap[taName] = { name: taName, replies: 0, onTime: 0, delayed: 0, durations: [], courses: new Set() };
@@ -1108,13 +1187,17 @@
                 if (typeof q.duration_hours === 'number' && !isNaN(q.duration_hours)) taMap[taName].durations.push(q.duration_hours);
             });
  
-            // Count pending per TA (unanswered queries where TA is the responder reference)
+            // Count pending per TA (mapped to assigned TA, fallback to first responder)
             const taPendingMap = {};
             queries.forEach(q => {
-                const taName = q.first_responder;
-                if (!taName || taName === "N/A") return;
+                const taName = q.assigned_ta_name || q.replied_by_name || q.first_responder;
+                if (!taName || taName === "N/A" || taName === "Unassigned") return;
                 if (q.replied === "No" && q.learner_name && q.learner_name !== "(No student posts yet)") {
                     taPendingMap[taName] = (taPendingMap[taName] || 0) + 1;
+                    if (!taMap[taName]) {
+                        taMap[taName] = { name: taName, replies: 0, onTime: 0, delayed: 0, durations: [], courses: new Set() };
+                    }
+                    if (q.course_name) taMap[taName].courses.add(q.course_name);
                 }
             });
 
@@ -1808,9 +1891,32 @@
 
         // Course details modal functions
         function showCourseDetailModal(courseName) {
-            const courseQueries = window.allQueries.filter(q => q.course_name === courseName);
+            const cohortVal = document.getElementById('filter-cohort')?.value || 'All';
+            let courseQueries = window.allQueries.filter(q => q.course_name === courseName);
+            if (cohortVal !== 'All') {
+                courseQueries = courseQueries.filter(q => q.cohort === cohortVal);
+            }
+            // Date filter
+            const datePreset = document.getElementById('filter-date-preset')?.value || 'all';
+            let fromDate = null;
+            let toDate = null;
+            const now = new Date();
+            if (datePreset === 'today') fromDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            else if (datePreset === '7days') fromDate = new Date(now.getTime() - 7 * 86400000);
+            else if (datePreset === '14days') fromDate = new Date(now.getTime() - 14 * 86400000);
+            else if (datePreset === '30days') fromDate = new Date(now.getTime() - 30 * 86400000);
+            else if (datePreset === 'custom') {
+                const fVal = document.getElementById('dash-filter-date-from')?.value;
+                const tVal = document.getElementById('dash-filter-date-to')?.value;
+                if (fVal) fromDate = new Date(fVal);
+                if (tVal) toDate = new Date(tVal);
+            }
+            if (fromDate || toDate) {
+                courseQueries = courseQueries.filter(q => isDateInRange(q.created_dt_iso, q.created_on, fromDate, toDate));
+            }
 
-            document.getElementById('course-modal-title').innerText = courseName;
+            const cohortSubtitle = cohortVal !== 'All' ? ` | Cohort: ${cohortVal}` : '';
+            document.getElementById('course-modal-title').innerText = `${courseName}${cohortSubtitle}`;
 
             const sheetId = window.spreadsheetId || '1-XJZvmt5hTklebUPn-Sjui0dWkUGoUJF-eIbzm-Y3KA';
             const sheetUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/edit`;
@@ -2240,6 +2346,7 @@
             if (modal) {
                 modal.classList.remove('hidden');
                 document.body.style.overflow = 'hidden';
+                populateEmailCourseDropdown();
             }
         }
 
@@ -2266,28 +2373,74 @@
                 modal.classList.remove('hidden');
                 document.body.style.overflow = 'hidden';
 
-                // Dynamically update preset buttons based on loaded dashboard courses
-                const presetContainer = document.getElementById('email-preset-buttons-container');
-                if (presetContainer && allData && allData.courses && allData.courses.length > 0) {
-                    const uniqueCourses = [...new Set(allData.courses)].filter(c => c && c !== 'N/A');
-                    if (uniqueCourses.length > 0) {
-                        let btnsHtml = '';
-                        uniqueCourses.forEach(c => {
-                            const label = c.length > 12 ? c.substring(0, 10) + '..' : c;
-                            btnsHtml += `<button type="button" onclick="selectEmailPreset('${c}')" class="text-[10px] font-semibold px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-white/80 hover:text-white border border-white/10 transition-all" title="${c}">${label}</button>`;
-                        });
-                        btnsHtml += `<button type="button" onclick="selectEmailPreset('ALL')" class="text-[10px] font-semibold px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-white/80 hover:text-white border border-white/10 transition-all">ALL</button>`;
-                        btnsHtml += `<button type="button" onclick="addCustomEmailPreset()" class="text-[10px] font-bold px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-white border border-white/15 transition-all" title="Add another course shell">+</button>`;
-                        presetContainer.innerHTML = btnsHtml;
+                // Sync active cohort from dashboard if selected
+                const dashCohort = document.getElementById('filter-cohort')?.value;
+                const emailCohortSelect = document.getElementById('email-filter-cohort');
+                if (emailCohortSelect) {
+                    const currentVal = emailCohortSelect.value;
+                    emailCohortSelect.innerHTML = '<option value="All" class="bg-[#050505] text-white">All Cohorts</option>';
+                    const cohortsToPopulate = new Set();
+                    if (window.allCohorts) {
+                        window.allCohorts.forEach(c => { if (c && c !== 'N/A') cohortsToPopulate.add(c); });
+                    }
+                    if (currentScanDataRaw && currentScanDataRaw.scanned_cohorts) {
+                        currentScanDataRaw.scanned_cohorts.forEach(c => { if (c && c !== 'N/A') cohortsToPopulate.add(c); });
+                    }
+                    [...cohortsToPopulate].sort().forEach(c => {
+                        const opt = document.createElement('option');
+                        opt.value = c;
+                        opt.className = "bg-[#050505] text-white";
+                        opt.innerText = c;
+                        emailCohortSelect.appendChild(opt);
+                    });
+                    if (dashCohort && dashCohort !== 'All' && [...emailCohortSelect.options].some(o => o.value === dashCohort)) {
+                        emailCohortSelect.value = dashCohort;
+                    } else if (currentVal && [...emailCohortSelect.options].some(o => o.value === currentVal)) {
+                        emailCohortSelect.value = currentVal;
                     }
                 }
 
-                // Pre-fill course shell if input on main page had something
+                // Dynamically update course datalist & quick select dropdown based on loaded dashboard courses
+                const courseDatalist = document.getElementById('email-course-shells-datalist');
+                const quickSelect = document.getElementById('email-quick-select-course');
+                const presetContainer = document.getElementById('email-preset-buttons-container');
+                if (allData && allData.courses && allData.courses.length > 0) {
+                    const uniqueCourses = [...new Set(allData.courses)].filter(c => c && c !== 'N/A').sort();
+                    if (uniqueCourses.length > 0) {
+                        if (courseDatalist) {
+                            courseDatalist.innerHTML = '<option value="ALL">ALL (Scan All Audited Courses)</option>' +
+                                uniqueCourses.map(c => `<option value="${c}">${c}</option>`).join('');
+                        }
+                        if (quickSelect) {
+                            const curQuickVal = quickSelect.value;
+                            quickSelect.innerHTML = '<option value="" class="bg-[#0c0c11] text-white">-- Pick Course Shell --</option>' +
+                                '<option value="ALL" class="bg-[#0c0c11] text-white font-bold">ALL Courses</option>' +
+                                uniqueCourses.map(c => `<option value="${c}" class="bg-[#0c0c11] text-white">${c}</option>`).join('');
+                            if (curQuickVal) quickSelect.value = curQuickVal;
+                        }
+                        if (presetContainer) {
+                            let btnsHtml = '';
+                            uniqueCourses.slice(0, 4).forEach(c => {
+                                const label = c.length > 12 ? c.substring(0, 10) + '..' : c;
+                                btnsHtml += `<button type="button" onclick="selectEmailPreset('${c}')" class="text-[10px] font-semibold px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-white/80 hover:text-white border border-white/10 transition-all" title="${c}">${label}</button>`;
+                            });
+                            btnsHtml += `<button type="button" onclick="selectEmailPreset('ALL')" class="text-[10px] font-semibold px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-white/80 hover:text-white border border-white/10 transition-all">ALL</button>`;
+                            presetContainer.innerHTML = btnsHtml;
+                        }
+                    }
+                }
+
+                // Pre-fill course shell if input on main page had something or dashboard has course filter
+                const dashCourse = document.getElementById('filter-course')?.value;
                 const mainCourseInput = document.getElementById('course_codes');
                 const emailCourseInput = document.getElementById('email-search-course-shell');
-                if (emailCourseInput && !emailCourseInput.value && mainCourseInput && mainCourseInput.value) {
-                    const firstCode = mainCourseInput.value.split(/[\s,]+/)[0];
-                    if (firstCode) emailCourseInput.value = firstCode;
+                if (emailCourseInput) {
+                    if (dashCourse && dashCourse !== 'All') {
+                        emailCourseInput.value = dashCourse;
+                    } else if (!emailCourseInput.value && mainCourseInput && mainCourseInput.value) {
+                        const firstCode = mainCourseInput.value.split(/[\s,]+/)[0];
+                        if (firstCode) emailCourseInput.value = firstCode;
+                    }
                 }
             }
         }
@@ -2297,6 +2450,46 @@
             if (modal) {
                 modal.classList.add('hidden');
                 document.body.style.overflow = '';
+            }
+        }
+
+        function onEmailCourseDropdownSelect(val) {
+            if (!val) return;
+            const input = document.getElementById('email-search-course-shell');
+            if (val === 'CUSTOM') {
+                const custom = prompt("Enter Course Shell ID(s) (e.g. BUS-940, or comma-separated BUS-902, BUS-940):");
+                if (custom && custom.trim()) {
+                    if (input) input.value = custom.trim();
+                    scanCoursePendingQueries();
+                } else {
+                    document.getElementById('email-quick-select-course').value = input ? input.value : '';
+                }
+                return;
+            }
+            if (input) input.value = val;
+            scanCoursePendingQueries();
+        }
+
+                async function populateEmailCourseDropdown() {
+            const selectEl = document.getElementById('email-quick-select-course');
+            if (!selectEl) return;
+            try {
+                const res = await fetch('/api/course-shells');
+                const data = await res.json();
+                if (data.success && data.course_shells && data.course_shells.length > 0) {
+                    window.allAuditedCourseTitles = data.course_shells;
+                    const cur = selectEl.value;
+                    let html = '<option value="" class="bg-[#0c0c11] text-white">-- Pick Course --</option>';
+                    html += '<option value="ALL" class="bg-[#0c0c11] text-white font-bold">ALL (All Audited Courses)</option>';
+                    data.course_shells.forEach(t => {
+                        html += `<option value="${t}" class="bg-[#0c0c11] text-white">${t}</option>`;
+                    });
+                    html += '<option value="CUSTOM" class="bg-[#0c0c11] text-amber-300 font-semibold">+ Custom / Multiple Shells...</option>';
+                    selectEl.innerHTML = html;
+                    if (cur) selectEl.value = cur;
+                }
+            } catch (err) {
+                console.warn('Failed to load course shells list:', err);
             }
         }
 
@@ -2345,6 +2538,8 @@
             }
         }
 
+        let currentScanDataRaw = null;
+
         async function scanCoursePendingQueries() {
             const input = document.getElementById('email-search-course-shell');
             const courseShell = input ? input.value.trim() : '';
@@ -2352,6 +2547,27 @@
                 showToast('Please enter a Course Shell ID to scan.', 'info');
                 if (input) input.focus();
                 return;
+            }
+
+            const courseVal = (document.getElementById('email-filter-course')?.value || 'All').trim();
+            const cohortVal = (document.getElementById('email-filter-cohort')?.value || 'All').trim();
+            const datePreset = document.getElementById('email-filter-date-preset')?.value || 'all';
+            let fromDateStr = '';
+            let toDateStr = '';
+            const now = new Date();
+            if (datePreset === 'today') {
+                fromDateStr = now.toISOString().split('T')[0];
+            } else if (datePreset === '3days') {
+                fromDateStr = new Date(now.getTime() - 3 * 86400000).toISOString().split('T')[0];
+            } else if (datePreset === '7days') {
+                fromDateStr = new Date(now.getTime() - 7 * 86400000).toISOString().split('T')[0];
+            } else if (datePreset === '14days') {
+                fromDateStr = new Date(now.getTime() - 14 * 86400000).toISOString().split('T')[0];
+            } else if (datePreset === '30days') {
+                fromDateStr = new Date(now.getTime() - 30 * 86400000).toISOString().split('T')[0];
+            } else if (datePreset === 'custom') {
+                fromDateStr = document.getElementById('email-filter-date-from')?.value || '';
+                toDateStr = document.getElementById('email-filter-date-to')?.value || '';
             }
 
             const loadingEl = document.getElementById('email-scan-loading');
@@ -2368,7 +2584,12 @@
                 const res = await fetch('/api/scan-pending-ta-emails', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ course_shell: courseShell })
+                    body: JSON.stringify({
+                        course_shell: courseShell,
+                        cohort: cohortVal,
+                        date_from: fromDateStr,
+                        date_to: toDateStr
+                    })
                 });
                 const data = await res.json();
 
@@ -2386,9 +2607,70 @@
                     return;
                 }
 
-                currentScanData = data;
+                currentScanDataRaw = JSON.parse(JSON.stringify(data));
+
+                // Populate email-filter-course dropdown with courses found in this scan
+                const emailCourseFilterSelect = document.getElementById('email-filter-course');
+                if (emailCourseFilterSelect) {
+                    const currentCourseVal = emailCourseFilterSelect.value;
+                    emailCourseFilterSelect.innerHTML = '<option value="All" class="bg-[#050505] text-white">All Courses</option>';
+                    const coursesToPopulate = new Set();
+                    if (data.course_shells_scanned) {
+                        data.course_shells_scanned.forEach(c => { if (c) coursesToPopulate.add(c); });
+                    }
+                    if (data.ta_groups) {
+                        data.ta_groups.forEach(g => {
+                            (g.queries || []).forEach(q => {
+                                const c = q.course_shell || q.course_code;
+                                if (c) coursesToPopulate.add(c);
+                            });
+                        });
+                    }
+                    [...coursesToPopulate].sort().forEach(c => {
+                        const opt = document.createElement('option');
+                        opt.value = c;
+                        opt.className = "bg-[#050505] text-white";
+                        opt.innerText = c;
+                        emailCourseFilterSelect.appendChild(opt);
+                    });
+                    if (currentCourseVal && [...emailCourseFilterSelect.options].some(o => o.value === currentCourseVal)) {
+                        emailCourseFilterSelect.value = currentCourseVal;
+                    }
+                }
+
+                // Populate email-filter-cohort dropdown with all cohorts found
+                const emailCohortSelect = document.getElementById('email-filter-cohort');
+                if (emailCohortSelect) {
+                    const currentVal = emailCohortSelect.value;
+                    emailCohortSelect.innerHTML = '<option value="All" class="bg-[#050505] text-white">All Cohorts</option>';
+                    const cohortsToPopulate = new Set();
+                    if (data.scanned_cohorts) {
+                        data.scanned_cohorts.forEach(c => { if (c && c !== 'N/A') cohortsToPopulate.add(c); });
+                    }
+                    if (data.ta_groups) {
+                        data.ta_groups.forEach(g => {
+                            (g.queries || []).forEach(q => {
+                                if (q.cohort && q.cohort !== 'N/A') cohortsToPopulate.add(q.cohort);
+                            });
+                        });
+                    }
+                    if (window.allCohorts) {
+                        window.allCohorts.forEach(c => { if (c && c !== 'N/A') cohortsToPopulate.add(c); });
+                    }
+                    [...cohortsToPopulate].sort().forEach(c => {
+                        const opt = document.createElement('option');
+                        opt.value = c;
+                        opt.className = "bg-[#050505] text-white";
+                        opt.innerText = c;
+                        emailCohortSelect.appendChild(opt);
+                    });
+                    if (currentVal && [...emailCohortSelect.options].some(o => o.value === currentVal)) {
+                        emailCohortSelect.value = currentVal;
+                    }
+                }
+
                 activeTaIndex = 0;
-                renderScanResults(data);
+                applyEmailModalFilters();
                 appendDispatchLog(`[${new Date().toLocaleTimeString()}] Scanned ${data.course_shell}. Found ${data.total_pending} pending queries across ${data.ta_groups.length} TAs.`);
 
             } catch (err) {
@@ -2400,6 +2682,118 @@
                 loadingEl.classList.add('hidden');
                 if (scanBtnText) scanBtnText.innerText = 'Scan Pending Queries';
             }
+        }
+
+        function onEmailDatePresetChanged(val) {
+            const customContainer = document.getElementById('email-custom-date-container');
+            if (customContainer) {
+                if (val === 'custom') {
+                    customContainer.classList.remove('hidden');
+                } else {
+                    customContainer.classList.add('hidden');
+                }
+            }
+            applyEmailModalFilters();
+        }
+
+        function resetEmailFilters() {
+            const courseSelect = document.getElementById('email-filter-course');
+            if (courseSelect) courseSelect.value = 'All';
+            const cohortSelect = document.getElementById('email-filter-cohort');
+            if (cohortSelect) cohortSelect.value = 'All';
+            const datePreset = document.getElementById('email-filter-date-preset');
+            if (datePreset) datePreset.value = 'all';
+            const customContainer = document.getElementById('email-custom-date-container');
+            if (customContainer) customContainer.classList.add('hidden');
+            const fFrom = document.getElementById('email-filter-date-from');
+            if (fFrom) fFrom.value = '';
+            const fTo = document.getElementById('email-filter-date-to');
+            if (fTo) fTo.value = '';
+            applyEmailModalFilters();
+        }
+
+        function applyEmailModalFilters() {
+            if (!currentScanDataRaw || !currentScanDataRaw.ta_groups) return;
+
+            const courseVal = (document.getElementById('email-filter-course')?.value || 'All').trim();
+            const cohortVal = (document.getElementById('email-filter-cohort')?.value || 'All').trim();
+            const datePreset = document.getElementById('email-filter-date-preset')?.value || 'all';
+
+            let fromDate = null;
+            let toDate = null;
+            const now = new Date();
+            if (datePreset === 'today') {
+                fromDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            } else if (datePreset === '3days') {
+                fromDate = new Date(now.getTime() - 3 * 86400000);
+            } else if (datePreset === '7days') {
+                fromDate = new Date(now.getTime() - 7 * 86400000);
+            } else if (datePreset === '14days') {
+                fromDate = new Date(now.getTime() - 14 * 86400000);
+            } else if (datePreset === '30days') {
+                fromDate = new Date(now.getTime() - 30 * 86400000);
+            } else if (datePreset === 'custom') {
+                const f = document.getElementById('email-filter-date-from')?.value;
+                const t = document.getElementById('email-filter-date-to')?.value;
+                if (f) fromDate = new Date(f);
+                if (t) toDate = new Date(t);
+            }
+
+            // Filter TA groups and their queries
+            const filteredTaGroups = [];
+            let totalFilteredPending = 0;
+
+            currentScanDataRaw.ta_groups.forEach(originalGroup => {
+                const matchingQueries = (originalGroup.queries || []).filter(q => {
+                    // Course filter
+                    if (courseVal !== 'All') {
+                        const qCourse = (q.course_shell || q.course_code || '').toUpperCase().trim();
+                        const selCourse = courseVal.toUpperCase().trim();
+                        if (qCourse !== selCourse && !qCourse.includes(selCourse)) return false;
+                    }
+                    // Cohort filter
+                    if (cohortVal !== 'All') {
+                        const qCoh = (q.cohort || '').toUpperCase().trim();
+                        const selCoh = cohortVal.toUpperCase().trim();
+                        if (qCoh !== selCoh) return false;
+                    }
+                    // Date filter
+                    if (fromDate || toDate) {
+                        if (!isDateInRange(q.created_dt_iso, q.created_on, fromDate, toDate)) return false;
+                    }
+                    return true;
+                });
+
+                if (matchingQueries.length > 0) {
+                    totalFilteredPending += matchingQueries.length;
+                    const clonedGroup = JSON.parse(JSON.stringify(originalGroup));
+                    clonedGroup.queries = matchingQueries;
+                    if (clonedGroup.stats) {
+                        clonedGroup.stats.pending = matchingQueries.length;
+                    }
+                    filteredTaGroups.push(clonedGroup);
+                }
+            });
+
+            // Clone currentScanDataRaw with filtered results
+            currentScanData = JSON.parse(JSON.stringify(currentScanDataRaw));
+            currentScanData.ta_groups = filteredTaGroups;
+            currentScanData.total_pending = totalFilteredPending;
+            currentScanData.active_cohort_filter = cohortVal;
+
+            // Update KPI chips
+            const kpiCourse = document.getElementById('kpi-scan-course');
+            if (kpiCourse) {
+                kpiCourse.innerText = courseVal !== 'All' ? courseVal : (currentScanDataRaw.course_shell || 'ALL');
+                kpiCourse.parentElement.title = kpiCourse.innerText;
+            }
+            const kpiCohort = document.getElementById('kpi-scan-cohort');
+            if (kpiCohort) kpiCohort.innerText = cohortVal;
+
+            if (activeTaIndex >= filteredTaGroups.length) {
+                activeTaIndex = 0;
+            }
+            renderScanResults(currentScanData);
         }
 
         function selectEmailPreset(preset) {
@@ -2570,9 +2964,36 @@
             const barSpoc = document.getElementById('bar-spoc-tag');
             if (barSpoc) barSpoc.innerText = `SPOC: ${cfg.full_name ? cfg.full_name.split(' ')[0] : 'Omkar'}`;
 
-            // Subject Line: Clean format "Gentle Reminder | Discussion Forum Queries" (no TA name, no course shell)
+            // Extract ONLY the courses that THIS faculty member's pending queries actually belong to!
+            const taUniqueCourses = [...new Set(
+                (group.queries || [])
+                    .map(q => q.course_shell || q.course_code)
+                    .filter(Boolean)
+            )];
+            const courseDisplay = taUniqueCourses.length > 0
+                ? taUniqueCourses.join(', ')
+                : (currentScanData.course_shell || currentScanData.course_code || 'the course');
+
+            // Extract ONLY the cohorts that THIS faculty member's pending queries actually belong to!
+            const taUniqueCohorts = [...new Set(
+                (group.queries || [])
+                    .map(q => q.cohort)
+                    .filter(c => c && c !== 'N/A')
+            )];
+
+            // Active Cohort Filter & Subject Line formatting
+            const activeCohort = (document.getElementById('email-filter-cohort')?.value || currentScanData.cohort_filter || currentScanData.active_cohort_filter || '').trim();
+            const isFilteredCohort = activeCohort && activeCohort.toUpperCase() !== 'ALL' && activeCohort !== '';
+            const cohortDisplay = isFilteredCohort
+                ? activeCohort
+                : (taUniqueCohorts.length > 0 ? taUniqueCohorts.join(', ') : '');
+
+            const cohortSubjectSuffix = cohortDisplay ? ` - Cohort ${cohortDisplay}` : '';
+            const cohortIntroSuffix = cohortDisplay ? ` (Cohort: ${cohortDisplay})` : '';
+
+            // Subject Line: Clean format "Gentle Reminder | Discussion Forum Queries" (includes cohort if present)
             const subjectInput = document.getElementById('draft-subject-input');
-            const defaultSubject = `Gentle Reminder | Discussion Forum Queries`;
+            const defaultSubject = `Gentle Reminder | Discussion Forum Queries${cohortSubjectSuffix}`;
             if (subjectInput) subjectInput.value = defaultSubject;
 
             // TA name helpers: extract last name for academic salutation
@@ -2583,21 +3004,17 @@
             const taLastName = taNameParts.length > 1 ? taNameParts[taNameParts.length - 1] : taNameParts[0];
             const taTitlePrefix = taHasProf ? 'Professor' : 'Dr.';
             const taSalutation = `Dear ${taTitlePrefix} ${taLastName},`;
-            const courseShellLabel = currentScanData.course_shell || currentScanData.course_code || '';
-            const multiCourse = currentScanData.course_shells_scanned && currentScanData.course_shells_scanned.length > 1;
-            const courseDisplay = multiCourse
-                ? (currentScanData.course_shells_scanned || []).join(', ')
-                : courseShellLabel;
+            const courseShellLabel = courseDisplay;
 
-            const overview = currentScanData.course_overview || {
-                total_posts: group.queries.length,
-                total_replied: 0,
-                within_sla: 0,
-                outside_sla: 0,
-                avg_response_hr: 0,
-                pending_count: currentScanData.total_pending || group.queries.length,
-                avg_pending_hr: 0
-            };
+            // TA Specific Performance Metrics (preventing cross-faculty / multi-course combo numbers)
+            const taStats = group.stats || {};
+            const taPending = group.queries.length;
+            const taReplies = taStats.replies || 0;
+            const taTotalPosts = taReplies + taPending;
+            const taWithinSla = taStats.ontime || 0;
+            const taOutsideSla = taStats.delayed || 0;
+            const taAvgResponse = taStats.avg_time !== undefined ? taStats.avg_time : 0;
+            const taAvgPending = taStats.avg_pending_hr !== undefined ? taStats.avg_pending_hr : 0;
 
             // Format the Discussion Summary as an aligned center-aligned table
             const sumTblHeader1 = `+-------------+---------------------------------------+-----------------------+`;
@@ -2605,12 +3022,12 @@
             const sumTblDivider = `+-------------+-----------+-------------+-------------+---------------+-------+`;
             const sumTblSubHdrs = `| Total Query | Within SLA| Outside SLA | Avg Resp HR | Pending Count |  Avg  |`;
             const sumTblSubDiv  = `+-------------+-----------+-------------+-------------+---------------+-------+`;
-            const col1 = String(overview.total_posts).padEnd(11);
-            const col2 = String(overview.within_sla).padEnd(9);
-            const col3 = String(overview.outside_sla).padEnd(11);
-            const col4 = (String(overview.avg_response_hr) + ' hrs').padEnd(11);
-            const col5 = String(overview.pending_count).padEnd(13);
-            const col6 = (String(overview.avg_pending_hr) + ' hrs').padEnd(5);
+            const col1 = String(taTotalPosts).padEnd(11);
+            const col2 = String(taWithinSla).padEnd(9);
+            const col3 = String(taOutsideSla).padEnd(11);
+            const col4 = (String(taAvgResponse) + ' hrs').padEnd(11);
+            const col5 = String(taPending).padEnd(13);
+            const col6 = (String(taAvgPending) + ' hrs').padEnd(5);
             const sumTblData    = `| ${col1} | ${col2} | ${col3} | ${col4} | ${col5} | ${col6} |`;
             const sumTblBottom  = `+-------------+-----------+-------------+-------------+---------------+-------+`;
 
@@ -2635,18 +3052,18 @@
                 'Follow us: Facebook | Twitter | LinkedIn | YouTube'
             ].join('\n');
 
-            // Plain text table
-            const tableHeader = `#  | Course Shell                | Learner Name          | Student Email                  | Discussion Topic                              | Date Raised`;
+            // Plain text table with Cohort column
+            const tableHeader = `#  | Cohort | Course Shell          | Learner Name          | Student Email                  | Discussion Topic                    | Date Raised`;
             const tableDivider = `-`.repeat(tableHeader.length);
             const tableRows = group.queries.map((q, i) => {
-                const course = q.course_shell || q.course_code || courseShellLabel;
                 const n = String(i + 1).padEnd(2);
-                const c = course.padEnd(27).slice(0, 27);
+                const co = (q.cohort || 'N/A').padEnd(6).slice(0, 6);
+                const course = (q.course_shell || q.course_code || courseShellLabel).padEnd(21).slice(0, 21);
                 const ln = (q.learner_name || '').padEnd(21).slice(0, 21);
                 const em = (q.learner_email || '').padEnd(30).slice(0, 30);
-                const tp = (q.topic || '').padEnd(45).slice(0, 45);
+                const tp = (q.topic || '').padEnd(35).slice(0, 35);
                 const dt = q.created_on || '';
-                return `${n} | ${c} | ${ln} | ${em} | ${tp} | ${dt}`;
+                return `${n} | ${co} | ${course} | ${ln} | ${em} | ${tp} | ${dt}`;
             }).join('\n');
 
             const graderNoteText = `Note: If grader intervention is not required for a specific query, please add a standard response such as “Grader intervention not required” or “Acknowledged.” Since the system automatically flags all unanswered queries, this will ensure that such queries are correctly marked as reviewed.`;
@@ -2656,9 +3073,9 @@
 
 I hope you are doing well.
 
-This is a general reminder that the following learners assigned to you have raised queries on the Discussion Board for the course ${courseDisplay}, and currently have pending queries awaiting a response on the Canvas Discussion Board.
+This is a general reminder that the following learners assigned to you have raised queries on the Discussion Board for the course ${courseDisplay}${cohortIntroSuffix}, and currently have pending queries awaiting a response on the Canvas Discussion Board.
 
-DISCUSSION SUMMARY:
+DISCUSSION SUMMARY (${taFullName}${isFilteredCohort ? ' - Cohort ' + activeCohort : ''}):
 ${overviewTableText}
 
 Please find below the summary of pending learner queries:
@@ -2689,28 +3106,51 @@ This is an auto-generated email.`;
 
         function buildHtmlBody(plainText, group) {
             const cfg = getEmailSettings();
-            const multiCourse = currentScanData.course_shells_scanned && currentScanData.course_shells_scanned.length > 1;
-            const courseShellLabel = currentScanData.course_shell || currentScanData.course_code;
             const taFullName = group.ta_name.trim();
-            const courseDisplay = multiCourse
-                ? (currentScanData.course_shells_scanned || []).join(', ')
-                : courseShellLabel;
 
-            const overview = currentScanData.course_overview || {
-                total_posts: group.queries.length,
-                total_replied: 0,
-                within_sla: 0,
-                outside_sla: 0,
-                avg_response_hr: 0,
-                pending_count: currentScanData.total_pending || group.queries.length,
-                avg_pending_hr: 0
-            };
+            // Extract ONLY the courses that THIS faculty member's pending queries actually belong to!
+            const taUniqueCourses = [...new Set(
+                (group.queries || [])
+                    .map(q => q.course_shell || q.course_code)
+                    .filter(Boolean)
+            )];
+            const courseDisplay = taUniqueCourses.length > 0
+                ? taUniqueCourses.join(', ')
+                : (currentScanData.course_shell || currentScanData.course_code || 'the course');
+
+            // Extract ONLY the cohorts that THIS faculty member's pending queries actually belong to!
+            const taUniqueCohorts = [...new Set(
+                (group.queries || [])
+                    .map(q => q.cohort)
+                    .filter(c => c && c !== 'N/A')
+            )];
+
+            const activeCohort = (document.getElementById('email-filter-cohort')?.value || currentScanData.cohort_filter || currentScanData.active_cohort_filter || '').trim();
+            const isFilteredCohort = activeCohort && activeCohort.toUpperCase() !== 'ALL' && activeCohort !== '';
+            const cohortDisplay = isFilteredCohort
+                ? activeCohort
+                : (taUniqueCohorts.length > 0 ? taUniqueCohorts.join(', ') : '');
+
+            const cohortIntroSuffix = cohortDisplay ? ` (Cohort: ${cohortDisplay})` : '';
+            const cohortTagHtml = cohortDisplay ? ` &bull; COHORT ${cohortDisplay}` : '';
+            const courseShellLabel = courseDisplay;
+
+            // TA Specific Performance Metrics (preventing cross-faculty / multi-course combo numbers)
+            const taStats = group.stats || {};
+            const taPending = group.queries.length;
+            const taReplies = taStats.replies || 0;
+            const taTotalPosts = taReplies + taPending;
+            const taWithinSla = taStats.ontime || 0;
+            const taOutsideSla = taStats.delayed || 0;
+            const taAvgResponse = taStats.avg_time !== undefined ? taStats.avg_time : 0;
+            const taAvgPending = taStats.avg_pending_hr !== undefined ? taStats.avg_pending_hr : 0;
 
             const queriesHtml = group.queries.map((q, idx) => {
                 const course = q.course_shell || q.course_code || courseShellLabel;
                 return `
                 <tr style="background: #ffffff; border-bottom: 1px solid #e5e7eb; text-align: center;">
                     <td style="padding: 7px 10px; font-size: 12px; color: #6b7280; font-weight: 600; text-align: center; border-right: 1px solid #e5e7eb; width: 30px;">${idx + 1}</td>
+                    <td style="padding: 7px 10px; font-size: 11px; font-weight: 700; color: #4338ca; background: #eef2ff; border-right: 1px solid #e5e7eb; text-align: center; white-space: nowrap;">${q.cohort || 'N/A'}</td>
                     <td style="padding: 7px 10px; font-size: 12px; font-weight: normal; color: #1e40af; border-right: 1px solid #e5e7eb; text-align: center; white-space: nowrap;">${course}</td>
                     <td style="padding: 7px 10px; font-size: 13px; font-weight: 600; color: #111827; border-right: 1px solid #e5e7eb; text-align: center;">${q.learner_name}</td>
                     <td style="padding: 7px 10px; font-size: 12px; color: #2563eb; border-right: 1px solid #e5e7eb; text-align: center;"><a href="mailto:${q.learner_email}" style="color: #2563eb; text-decoration: underline;">${q.learner_email}</a></td>
@@ -2742,13 +3182,13 @@ This is an auto-generated email.`;
               <p style="margin: 0 0 14px 0; font-size: 13px; color: #374151;">I hope you are doing well.</p>
 
               <p style="margin: 0 0 16px 0; font-size: 13px; color: #374151; line-height: 1.6;">
-                This is a general reminder that the following learners assigned to you have raised queries on the Discussion Board for the course ${courseDisplay}, and currently have pending queries awaiting a response on the Canvas Discussion Board.
+                This is a general reminder that the following learners assigned to you have raised queries on the Discussion Board for the course ${courseDisplay}${cohortIntroSuffix}, and currently have pending queries awaiting a response on the Canvas Discussion Board.
               </p>
 
-              <!-- Discussion Summary Table (At the top, Center Aligned, No TA repetition) -->
+              <!-- Discussion Summary Table (At the top, Center Aligned, TA Specific) -->
               <div style="margin: 16px 0 18px 0; border: 1px solid #d1d5db; border-radius: 8px; overflow: hidden; background: #ffffff;">
                 <div style="background: #1e3a8a; padding: 9px 14px; color: #ffffff; font-weight: 700; font-size: 12px; letter-spacing: 0.3px; text-align: center;">
-                  DISCUSSION SUMMARY
+                  DISCUSSION SUMMARY &mdash; ${taFullName.toUpperCase()}${cohortTagHtml}
                 </div>
                 <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; width: 100%; font-size: 11px; text-align: center;">
                   <thead>
@@ -2768,12 +3208,12 @@ This is an auto-generated email.`;
                   </thead>
                   <tbody>
                     <tr style="text-align: center; font-size: 11px; font-weight: 600; color: #0f172a;">
-                      <td style="padding: 9px; border-right: 1px solid #cbd5e1; background: #f8fafc; text-align: center;">${overview.total_posts}</td>
-                      <td style="padding: 9px; border-right: 1px solid #cbd5e1; color: #15803d; text-align: center;">${overview.within_sla}</td>
-                      <td style="padding: 9px; border-right: 1px solid #cbd5e1; color: #b91c1c; text-align: center;">${overview.outside_sla}</td>
-                      <td style="padding: 9px; border-right: 1px solid #cbd5e1; text-align: center;">${overview.avg_response_hr} hrs</td>
-                      <td style="padding: 9px; border-right: 1px solid #cbd5e1; color: #b91c1c; font-weight: 700; text-align: center;">${overview.pending_count}</td>
-                      <td style="padding: 9px; color: #64748b; text-align: center;">${overview.avg_pending_hr} hrs</td>
+                      <td style="padding: 9px; border-right: 1px solid #cbd5e1; background: #f8fafc; text-align: center;">${taTotalPosts}</td>
+                      <td style="padding: 9px; border-right: 1px solid #cbd5e1; color: #15803d; text-align: center;">${taWithinSla}</td>
+                      <td style="padding: 9px; border-right: 1px solid #cbd5e1; color: #b91c1c; text-align: center;">${taOutsideSla}</td>
+                      <td style="padding: 9px; border-right: 1px solid #cbd5e1; text-align: center;">${taAvgResponse} hrs</td>
+                      <td style="padding: 9px; border-right: 1px solid #cbd5e1; color: #b91c1c; font-weight: 700; text-align: center;">${taPending}</td>
+                      <td style="padding: 9px; color: #64748b; text-align: center;">${taAvgPending} hrs</td>
                     </tr>
                   </tbody>
                 </table>
@@ -2783,11 +3223,12 @@ This is an auto-generated email.`;
                 Pending Learner Queries Details:
               </p>
 
-              <!-- Clean Corporate Table (Learner Details, Center Aligned) -->
+              <!-- Clean Corporate Table (Learner Details, Center Aligned, with Cohort) -->
               <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; width: 100%; margin: 8px 0 20px 0; font-size: 12px; border: 1px solid #d1d5db; text-align: center;">
                 <thead>
                   <tr style="background: #f9fafb; border-bottom: 1px solid #d1d5db; text-align: center;">
                     <th style="padding: 8px 10px; font-size: 11px; font-weight: 700; color: #374151; text-align: center; border-right: 1px solid #e5e7eb; width: 30px;">#</th>
+                    <th style="padding: 8px 10px; font-size: 11px; font-weight: 700; color: #374151; text-align: center; border-right: 1px solid #e5e7eb; width: 65px;">Cohort</th>
                     <th style="padding: 8px 10px; font-size: 11px; font-weight: 700; color: #374151; text-align: center; border-right: 1px solid #e5e7eb;">Course Shell</th>
                     <th style="padding: 8px 10px; font-size: 11px; font-weight: 700; color: #374151; text-align: center; border-right: 1px solid #e5e7eb;">Learner Name</th>
                     <th style="padding: 8px 10px; font-size: 11px; font-weight: 700; color: #374151; text-align: center; border-right: 1px solid #e5e7eb;">Student Email</th>
@@ -2798,7 +3239,7 @@ This is an auto-generated email.`;
                 <tbody>
                   ${queriesHtml}
                   <tr style="background: #f9fafb; border-top: 1px solid #e5e7eb;">
-                    <td colspan="6" style="padding: 6px 10px; font-size: 11px; color: #6b7280; font-style: italic; text-align: center;">
+                    <td colspan="7" style="padding: 6px 10px; font-size: 11px; color: #6b7280; font-style: italic; text-align: center;">
                       Showing ${totalCount} of ${totalCount} pending ${totalCount === 1 ? 'query' : 'queries'}
                     </td>
                   </tr>
@@ -3344,46 +3785,106 @@ This is an auto-generated email.`;
                 </div>
             </div>
 
-            <!-- COMPACT SEARCH & KPI STRIP (1 line) -->
-            <div class="px-4 py-2 bg-white/[0.02] border-b border-white/[0.06] flex items-center justify-between flex-shrink-0 gap-3">
-                <!-- Search input with presets -->
-                <div class="flex items-center gap-2 flex-grow max-w-2xl">
-                    <div class="relative flex-grow">
-                        <input type="text" id="email-search-course-shell" placeholder="Course Shell (e.g. BUS-940-UC6--Fall-2026, or ALL)"
-                            onkeydown="if(event.key==='Enter') scanCoursePendingQueries()"
-                            class="w-full bg-black/40 border border-white/10 rounded-lg pl-3 pr-2 py-1.5 text-xs text-white placeholder-white/30 focus:outline-none focus:border-[#EE2C3C]/60 font-mono">
+            <!-- COMPACT SEARCH & FILTER & KPI STRIP (Matching Screenshot) -->
+            <div class="px-4 py-2.5 bg-[#0f0f15] border-b border-white/[0.08] flex flex-wrap items-center justify-between flex-shrink-0 gap-2.5">
+                <!-- Hidden Course Shell Input for scan engine -->
+                <input type="hidden" id="email-search-course-shell" value="ALL">
+
+                <!-- Left Group: Controls matching screenshot -->
+                <div class="flex flex-wrap items-center gap-2">
+                    <!-- [-- Pick Course -- v] -->
+                    <div class="h-8 flex items-center bg-black/60 border border-white/10 rounded-xl px-2.5 transition-colors hover:border-white/20">
+                        <select id="email-quick-select-course" onchange="onEmailCourseDropdownSelect(this.value)"
+                            class="bg-transparent text-white text-xs font-semibold focus:outline-none cursor-pointer pr-1"
+                            title="Select a course shell to scan">
+                            <option value="" class="bg-[#0c0c11] text-white">-- Pick Course --</option>
+                            <option value="ALL" class="bg-[#0c0c11] text-white font-bold">ALL (All Audited Courses)</option>
+                            <option value="BUS-902-UC08--Fall-2026" class="bg-[#0c0c11] text-white">BUS-902-UC08--Fall-2026</option>
+                            <option value="BUS-902-UC10--Fall-2026" class="bg-[#0c0c11] text-white">BUS-902-UC10--Fall-2026</option>
+                            <option value="BUS-940-UC6--Fall-2026" class="bg-[#0c0c11] text-white">BUS-940-UC6--Fall-2026</option>
+                            <option value="BUS-941-UC6--Fall-2026" class="bg-[#0c0c11] text-white">BUS-941-UC6--Fall-2026</option>
+                            <option value="CUSTOM" class="bg-[#0c0c11] text-amber-300 font-semibold">+ Custom / Multiple Shells...</option>
+                        </select>
                     </div>
-                    <!-- Presets container (auto-populated with audited course tabs) -->
-                    <div id="email-preset-buttons-container" class="flex items-center gap-1 flex-shrink-0">
-                        <button type="button" onclick="selectEmailPreset('BUS-940-UC6--Fall-2026')" class="text-[10px] font-semibold px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-white/80 hover:text-white border border-white/10 transition-all">
-                            BUS 940
-                        </button>
-                        <button type="button" onclick="selectEmailPreset('BUS-902-UC7--Fall-2026')" class="text-[10px] font-semibold px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-white/80 hover:text-white border border-white/10 transition-all">
-                            BUS 902
-                        </button>
-                        <button type="button" onclick="selectEmailPreset('ALL')" class="text-[10px] font-semibold px-2 py-1 rounded bg-white/5 hover:bg-white/10 text-white/80 hover:text-white border border-white/10 transition-all">
-                            ALL
-                        </button>
-                        <button type="button" onclick="addCustomEmailPreset()" class="text-[10px] font-bold px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-white border border-white/15 transition-all" title="Add another course shell">
-                            +
-                        </button>
-                    </div>
+
+                    <!-- [ ALL ] Button -->
+                    <button type="button" onclick="selectEmailPreset('ALL')"
+                        class="h-8 px-3.5 bg-black/60 hover:bg-white/10 text-white font-bold text-xs border border-white/10 hover:border-white/25 rounded-xl transition-all shadow-sm"
+                        title="Scan all audited courses">
+                        ALL
+                    </button>
+
+                    <!-- [ Q Scan Pending Queries ] Red Button -->
                     <button type="button" id="btn-scan-course-pending" onclick="scanCoursePendingQueries()"
-                        class="px-3.5 py-1.5 bg-[#EE2C3C] hover:bg-[#d92231] rounded-lg text-xs font-semibold text-white shadow transition-all flex items-center gap-1.5 flex-shrink-0">
-                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                        <span id="btn-scan-course-text">Scan</span>
+                        class="h-8 px-4 bg-[#EE2C3C] hover:bg-[#d92231] rounded-xl text-xs font-bold text-white shadow-md transition-all flex items-center gap-1.5 shadow-[#EE2C3C]/20 hover:shadow-[#EE2C3C]/40">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                        <span id="btn-scan-course-text">Scan Pending Queries</span>
+                    </button>
+
+                    <!-- [ COURSE : All Courses v ] -->
+                    <div class="h-8 flex items-center bg-black/60 border border-white/10 rounded-xl px-2.5 transition-colors hover:border-white/20">
+                        <span class="text-[10px] font-bold text-white/40 uppercase tracking-wider mr-1.5 font-mono">COURSE :</span>
+                        <select id="email-filter-course" onchange="applyEmailModalFilters()"
+                            class="bg-transparent text-white text-xs font-semibold focus:outline-none cursor-pointer max-w-[150px] truncate"
+                            title="Filter queries by specific course shell">
+                            <option value="All" class="bg-[#050505] text-white">All Courses</option>
+                        </select>
+                    </div>
+
+                    <!-- [ COHORT : All Cohorts v ] -->
+                    <div class="h-8 flex items-center bg-black/60 border border-white/10 rounded-xl px-2.5 transition-colors hover:border-white/20">
+                        <span class="text-[10px] font-bold text-white/40 uppercase tracking-wider mr-1.5 font-mono">COHORT :</span>
+                        <select id="email-filter-cohort" onchange="applyEmailModalFilters()"
+                            class="bg-transparent text-white text-xs font-semibold focus:outline-none cursor-pointer"
+                            title="Filter queries by Cohort ID">
+                            <option value="All" class="bg-[#050505] text-white">All Cohorts</option>
+                        </select>
+                    </div>
+
+                    <!-- [ DATE : All Dates v ] -->
+                    <div class="h-8 flex items-center bg-black/60 border border-white/10 rounded-xl px-2.5 transition-colors hover:border-white/20">
+                        <span class="text-[10px] font-bold text-white/40 uppercase tracking-wider mr-1.5 font-mono">DATE :</span>
+                        <select id="email-filter-date-preset" onchange="onEmailDatePresetChanged(this.value)"
+                            class="bg-transparent text-white text-xs font-semibold focus:outline-none cursor-pointer">
+                            <option value="all" class="bg-[#050505] text-white">All Dates</option>
+                            <option value="today" class="bg-[#050505] text-white">Today</option>
+                            <option value="3days" class="bg-[#050505] text-white">Last 3 Days</option>
+                            <option value="7days" class="bg-[#050505] text-white">Last 7 Days</option>
+                            <option value="14days" class="bg-[#050505] text-white">Last 14 Days</option>
+                            <option value="30days" class="bg-[#050505] text-white">Last 30 Days</option>
+                            <option value="custom" class="bg-[#050505] text-white">Custom Range...</option>
+                        </select>
+                    </div>
+
+                    <!-- Custom Date Picker Range -->
+                    <div id="email-custom-date-container" class="hidden flex items-center gap-1">
+                        <input type="date" id="email-filter-date-from" onchange="applyEmailModalFilters()" class="bg-black/40 border border-white/10 rounded-lg px-2 py-1 text-[11px] text-white font-mono focus:outline-none" title="From Date">
+                        <span class="text-white/30 text-[10px]">to</span>
+                        <input type="date" id="email-filter-date-to" onchange="applyEmailModalFilters()" class="bg-black/40 border border-white/10 rounded-lg px-2 py-1 text-[11px] text-white font-mono focus:outline-none" title="To Date">
+                    </div>
+
+                    <!-- [ Reset ] Button -->
+                    <button type="button" id="btn-reset-email-filter" onclick="resetEmailFilters()"
+                        class="h-8 px-3 text-xs text-white/70 hover:text-white bg-black/60 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl transition-all font-medium"
+                        title="Reset Course, Cohort & Date filters">
+                        Reset
                     </button>
                 </div>
 
-                <!-- Compact KPI Chips -->
-                <div class="flex items-center gap-2 text-xs flex-shrink-0 font-mono">
-                    <span class="bg-black/30 px-2 py-1 rounded border border-white/5 text-white/70">
+                <!-- Right Group: Compact KPI Chips -->
+                <div class="hidden xl:flex items-center gap-2 text-xs flex-shrink-0 font-mono ml-auto">
+                    <span class="bg-black/40 px-2.5 py-1 rounded-xl border border-white/10 text-white/70 max-w-[200px] truncate" title="Active Scanned Course">
                         Course: <strong id="kpi-scan-course" class="text-white">--</strong>
                     </span>
-                    <span class="bg-black/30 px-2 py-1 rounded border border-white/5 text-amber-300">
+                    <span class="bg-black/40 px-2.5 py-1 rounded-xl border border-white/10 text-emerald-400">
+                        Cohort: <strong id="kpi-scan-cohort" class="text-white">All</strong>
+                    </span>
+                    <span class="bg-black/40 px-2.5 py-1 rounded-xl border border-white/10 text-amber-300">
                         Pending: <strong id="kpi-scan-pending">0</strong>
                     </span>
-                    <span class="bg-black/30 px-2 py-1 rounded border border-white/5 text-blue-300">
+                    <span class="bg-black/40 px-2.5 py-1 rounded-xl border border-white/10 text-blue-300">
                         TAs: <strong id="kpi-scan-tas">0</strong>
                     </span>
                 </div>

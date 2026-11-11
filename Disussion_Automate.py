@@ -295,10 +295,15 @@ def get_cohort_and_course(sis_id, course_name_api):
     """Extract Cohort (e.g. UC5, UC6, UB1, UED5) and Course (e.g. BUS 940, BUS 501) from SIS ID or Course Name."""
     s_clean = str(sis_id).strip()
 
-    # Cohort Extraction (Supports UC5, UC6, UB1, UED10, etc.)
-    cohort_match = re.search(r"(UC|UB|UED)\s*(\d+)", s_clean, re.IGNORECASE)
+    # Cohort Extraction (Supports UC5, UC6, UB1, UED10, Cohort 6, etc.)
+    cohort_match = re.search(r"(UC|UB|UED|COHORT|C)\s*(\d+)", s_clean, re.IGNORECASE)
+    if not cohort_match and course_name_api:
+        cohort_match = re.search(r"(UC|UB|UED|COHORT|C)\s*(\d+)", str(course_name_api), re.IGNORECASE)
     if cohort_match:
-        cohort = f"{cohort_match.group(1).upper()}{cohort_match.group(2)}"
+        prefix = cohort_match.group(1).upper()
+        if prefix in ("COHORT", "C"):
+            prefix = "UC"
+        cohort = f"{prefix}{cohort_match.group(2)}"
     else:
         cohort = "N/A"
 

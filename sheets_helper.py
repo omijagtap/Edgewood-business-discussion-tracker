@@ -423,6 +423,8 @@ def parse_date_string(date_str):
         "%b %d, %Y %I:%M %p",      # e.g. Apr 24, 2025 10:32 PM
         "%b %d, %Y, %I:%M %p",
         "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d",
+        "%Y-%m-%dT%H:%M:%S",
     ]
     for fmt in formats:
         try:
@@ -730,47 +732,71 @@ def get_dashboard_data(force_refresh=False):
     return result
 
 
-def _scan_single_worksheet(sh, course_shell_id, pending_by_ta_agg, ta_stats_agg=None, course_stats_agg=None):
-    """Internal helper: scans one worksheet and aggregates pending queries into pending_by_ta_agg dict.
-    Also computes full course overview stats and per-TA response metrics.
-    Returns (found, ws_title, course_code, local_pending_count)."""
-    if ta_stats_agg is None:
-        ta_stats_agg = {}
-    if course_stats_agg is None:
-        course_stats_agg = {
-            "total_posts": 0, "total_replied": 0, "within_sla": 0, "outside_sla": 0,
-            "pending_count": 0, "durs": [], "pending_durs": []
-        }
 
-    clean_target = str(course_shell_id).strip()
-    target_norm = normalize_course_code(clean_target)
-    safe_target = re.sub(r'[:\\\/\?\*\[\]]', '_', clean_target)[:31].lower()
-    alphanumeric_target = re.sub(r'[\s\-_]+', '', clean_target).lower()
+# ──────────────────────────────────────────────────────────────────
+#  WORKSHEET DATA IN-MEMORY CACHE (Prevents Google Sheets 429 Rate Limits)
+# ──────────────────────────────────────────────────────────────────
+_sheets_data_cache = {
+    "worksheets_data": {},  # {title: rows}
+    "titles": [],           # [audited titles]
+    "fetched_at": 0
+}
+SHEETS_CACHE_TTL = 180  # Cache for 3 minutes
 
-    ws = None
-    for w in sh.worksheets():
-        w_title_lower = w.title.lower()
-        w_title_clean = w_title_lower.replace(' ', '').replace('_', '')
-        w_title_alpha = re.sub(r'[\s\-_]+', '', w_title_lower)
-        if ('importdata' in w_title_clean and 'ta' in w_title_clean) or 'tadetail' in w_title_clean:
-            continue
-        if w_title_lower == clean_target.lower() or w_title_lower == safe_target:
-            ws = w
-            break
-        if target_norm and target_norm.lower() in w_title_lower:
-            ws = w
-            break
-        if alphanumeric_target and alphanumeric_target in w_title_alpha:
-            ws = w
-            break
+def get_audited_worksheets_data(force_refresh=False):
+    """Fetches all audited worksheets data ONCE in parallel and caches in memory.
+    Gracefully handles Google Sheets API rate limits (429) by serving from cache."""
+    import time as _time
+    now = _time.time()
+    
+    if not force_refresh and _sheets_data_cache["worksheets_data"] and (now - _sheets_data_cache["fetched_at"]) < SHEETS_CACHE_TTL:
+        return _sheets_data_cache["worksheets_data"], _sheets_data_cache["titles"]
 
-    if not ws:
-        return False, course_shell_id, target_norm, 0
+    try:
+        gc = get_google_client()
+        sh = gc.open_by_key(SPREADSHEET_ID)
+        ws_list = sh.worksheets()
+        audited_worksheets = []
+        for w in ws_list:
+            t_clean = w.title.lower().replace(' ', '').replace('_', '')
+            if ('importdata' in t_clean and 'ta' in t_clean) or 'tadetail' in t_clean:
+                continue
+            audited_worksheets.append(w)
 
-    rows = ws.get_all_values()
+        data_dict = {}
+        with ThreadPoolExecutor(max_workers=6) as executor:
+            results = executor.map(fetch_worksheet_data, audited_worksheets)
+            for title, values in results:
+                if values:
+                    data_dict[title] = values
+
+        _sheets_data_cache["worksheets_data"] = data_dict
+        _sheets_data_cache["titles"] = [w.title for w in audited_worksheets]
+        _sheets_data_cache["fetched_at"] = now
+        return data_dict, _sheets_data_cache["titles"]
+
+    except Exception as e:
+        err_msg = str(e)
+        if ("429" in err_msg or "Quota exceeded" in err_msg) and _sheets_data_cache["worksheets_data"]:
+            print("  [!] Google Sheets 429 rate limit hit. Serving from warm memory cache.")
+            return _sheets_data_cache["worksheets_data"], _sheets_data_cache["titles"]
+        raise
+
+def get_audited_sheet_titles():
+    """Return all clean audited course worksheet titles for UI dropdown."""
+    try:
+        _, titles = get_audited_worksheets_data()
+        return titles
+    except Exception:
+        return _sheets_data_cache.get("titles", [])
+
+
+def _scan_worksheet_rows(ws_title, rows, target_norm, pending_by_ta_agg, ta_stats_agg, course_stats_agg,
+                        cohort_filter=None, date_from=None, date_to=None, all_cohorts_found=None):
+    """Scans pre-fetched worksheet rows entirely in memory with 0 Google API calls."""
     local_pending = 0
     if len(rows) < 3:
-        return True, ws.title, target_norm, 0
+        return 0
 
     now_dt = datetime.now()
 
@@ -786,6 +812,16 @@ def _scan_single_worksheet(sh, course_shell_id, pending_by_ta_agg, ta_stats_agg=
             break
         padded = r + [""] * (14 - len(r))
         cohort = padded[0].strip()
+        if not cohort or cohort == "N/A":
+            m_c = re.search(r'(UC|UB|UED)\s*(\d+)', ws_title, re.I)
+            if m_c:
+                cohort = f"{m_c.group(1).upper()}{m_c.group(2)}"
+            else:
+                cohort = "N/A"
+
+        if all_cohorts_found is not None and cohort and cohort != "N/A":
+            all_cohorts_found.add(cohort)
+
         c_name = padded[1].strip() or target_norm
         topic = padded[2].strip()
         l_name = padded[3].strip()
@@ -802,6 +838,20 @@ def _scan_single_worksheet(sh, course_shell_id, pending_by_ta_agg, ta_stats_agg=
 
         if not l_name or l_name in ("(No student posts yet)", "N/A", "Unknown", "User#None"):
             continue
+
+        # Cohort filter
+        if cohort_filter and cohort_filter.upper() not in ("ALL", ""):
+            if cohort.upper() != cohort_filter.upper():
+                continue
+
+        # Date filter
+        c_dt = parse_date_string(created_on)
+        if date_from and c_dt:
+            if c_dt < date_from:
+                continue
+        if date_to and c_dt:
+            if c_dt > date_to:
+                continue
 
         course_stats_agg["total_posts"] += 1
 
@@ -829,7 +879,6 @@ def _scan_single_worksheet(sh, course_shell_id, pending_by_ta_agg, ta_stats_agg=
             course_stats_agg["pending_count"] += 1
             ta_stats_agg[ta_name]["pending"] += 1
 
-            c_dt = parse_date_string(created_on)
             if c_dt:
                 age_hrs = max(0.0, round((now_dt - c_dt).total_seconds() / 3600.0, 1))
                 course_stats_agg["pending_durs"].append(age_hrs)
@@ -849,7 +898,7 @@ def _scan_single_worksheet(sh, course_shell_id, pending_by_ta_agg, ta_stats_agg=
                 "topic": topic,
                 "created_on": created_on,
                 "cohort": cohort,
-                "course_shell": ws.title,
+                "course_shell": ws_title,
                 "course_code": c_name
             })
         else:
@@ -877,30 +926,25 @@ def _scan_single_worksheet(sh, course_shell_id, pending_by_ta_agg, ta_stats_agg=
                 except ValueError:
                     pass
 
-    return True, ws.title, target_norm, local_pending
+    return local_pending
 
 
-def get_pending_ta_summary(course_shell_input):
+def get_pending_ta_summary(course_shell_input, cohort_filter=None, date_from=None, date_to=None):
     """Scans the Google Sheet for one or more course shells and groups pending learner queries by assigned TA.
+    Uses in-memory cache to prevent Google Sheets 429 quota errors.
     Supports comma or space separated shells, or 'ALL' to scan every audited tab."""
     import re as _re
-    gc = get_google_client()
-    sh = gc.open_by_key(SPREADSHEET_ID)
 
     raw_input = str(course_shell_input).strip()
     is_all = raw_input.upper() == "ALL"
 
+    # Fetch cached worksheet data once (0 API calls on warm cache)
+    data_dict, audited_titles = get_audited_worksheets_data()
+
     # Split by comma or semicolon
     shells = [s.strip() for s in _re.split(r'[,;]+', raw_input) if s.strip()]
-
     if is_all or not shells:
-        # Collect all non-config worksheets
-        shells = []
-        for w in sh.worksheets():
-            t_clean = w.title.lower().replace(' ', '').replace('_', '')
-            if ('importdata' in t_clean and 'ta' in t_clean) or 'tadetail' in t_clean:
-                continue
-            shells.append(w.title)
+        shells = audited_titles
 
     pending_by_ta_agg = {}  # key=(ta_name, ta_email)
     course_stats_agg = {
@@ -916,16 +960,44 @@ def get_pending_ta_summary(course_shell_input):
     total_pending = 0
     course_shells_found = []
     course_shells_missing = []
+    all_cohorts_found = set()
 
     for shell in shells:
-        found, ws_title, course_code, local_count = _scan_single_worksheet(
-            sh, shell, pending_by_ta_agg, ta_stats_agg, course_stats_agg
-        )
-        if found:
-            course_shells_found.append(ws_title)
-            total_pending += local_count
-        else:
+        clean_target = str(shell).strip()
+        target_norm = normalize_course_code(clean_target)
+        safe_target = _re.sub(r'[:\\/\?\*\[\]]', '_', clean_target)[:31].lower()
+        alphanumeric_target = _re.sub(r'[\s\-_]+', '', clean_target).lower()
+
+        # Match shell against cached worksheet titles in memory
+        matched_title = None
+        for t in data_dict.keys():
+            t_lower = t.lower()
+            t_clean = t_lower.replace(' ', '').replace('_', '')
+            t_alpha = _re.sub(r'[\s\-_]+', '', t_lower)
+            if t_lower == clean_target.lower() or t_lower == safe_target:
+                matched_title = t
+                break
+            if target_norm and target_norm.lower() in t_lower:
+                matched_title = t
+                break
+            if alphanumeric_target and alphanumeric_target in t_alpha:
+                matched_title = t
+                break
+
+        if not matched_title:
             course_shells_missing.append(shell)
+            continue
+
+        rows = data_dict[matched_title]
+        course_shells_found.append(matched_title)
+
+        # Scan rows in memory
+        local_pending = _scan_worksheet_rows(
+            matched_title, rows, target_norm, pending_by_ta_agg, ta_stats_agg, course_stats_agg,
+            cohort_filter=cohort_filter, date_from=date_from, date_to=date_to,
+            all_cohorts_found=all_cohorts_found
+        )
+        total_pending += local_pending
 
     if not course_shells_found:
         return {
@@ -937,7 +1009,8 @@ def get_pending_ta_summary(course_shell_input):
             "course_overview": {
                 "total_posts": 0, "total_replied": 0, "within_sla": 0, "outside_sla": 0,
                 "avg_response_hr": 0, "pending_count": 0, "avg_pending_hr": 0
-            }
+            },
+            "scanned_cohorts": sorted(list(all_cohorts_found))
         }
 
     ta_groups = list(pending_by_ta_agg.values())
@@ -947,6 +1020,7 @@ def get_pending_ta_summary(course_shell_input):
     for g in ta_groups:
         s = ta_stats_agg.get(g["ta_name"]) or {}
         durs = s.get("durs", [])
+        p_durs = s.get("pending_durs", [])
         reps = s.get("replies", 0)
         delays = s.get("delayed", 0)
         g["stats"] = {
@@ -955,6 +1029,7 @@ def get_pending_ta_summary(course_shell_input):
             "ontime": s.get("ontime", 0),
             "delayed": delays,
             "avg_time": round(sum(durs)/len(durs), 2) if durs else 0,
+            "avg_pending_hr": round(sum(p_durs)/len(p_durs), 1) if p_durs else 0,
             "sla_violation_pct": round((delays/reps)*100, 1) if reps > 0 else 0
         }
 
@@ -976,16 +1051,14 @@ def get_pending_ta_summary(course_shell_input):
     primary_shell = course_shells_found[0] if len(course_shells_found) == 1 else ", ".join(course_shells_found)
     primary_code = normalize_course_code(course_shells_found[0]) if course_shells_found else raw_input
 
-    result = {
+    return {
         "found": True,
         "course_shell": primary_shell,
         "course_code": primary_code,
         "course_shells_scanned": course_shells_found,
-        "course_shells_missing": course_shells_missing,
+        "cohort_filter": cohort_filter or "ALL",
+        "scanned_cohorts": sorted(list(all_cohorts_found)),
         "total_pending": total_pending,
         "course_overview": course_overview,
         "ta_groups": ta_groups
     }
-    if is_all:
-        result["scanned_all"] = True
-    return result

@@ -390,17 +390,39 @@ def verify_credentials():
             "is_cloud_block": is_cloud_block
         }), 500
 
+@app.route('/api/course-shells', methods=['GET'])
+@app.route('/api/index/api/course-shells', methods=['GET'])
+@app.route('/api/index/course-shells', methods=['GET'])
+def get_course_shells():
+    try:
+        titles = sheets_helper.get_audited_sheet_titles()
+        return jsonify({"success": True, "course_shells": titles})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e), "course_shells": []})
+
 @app.route('/api/scan-pending-ta-emails', methods=['POST'])
 @app.route('/api/index/api/scan-pending-ta-emails', methods=['POST'])
 @app.route('/api/index/scan-pending-ta-emails', methods=['POST'])
 def scan_pending_ta_emails():
     data = request.json or {}
     course_shell = (data.get('course_shell') or '').strip()
+    cohort_filter = (data.get('cohort') or '').strip()
+    date_from_str = (data.get('date_from') or '').strip()
+    date_to_str = (data.get('date_to') or '').strip()
+
     if not course_shell:
         return jsonify({"error": "Please provide a valid Course Shell ID."}), 400
 
+    date_from = sheets_helper.parse_date_string(date_from_str) if date_from_str else None
+    date_to = sheets_helper.parse_date_string(date_to_str) if date_to_str else None
+
     try:
-        summary = sheets_helper.get_pending_ta_summary(course_shell)
+        summary = sheets_helper.get_pending_ta_summary(
+            course_shell,
+            cohort_filter=cohort_filter,
+            date_from=date_from,
+            date_to=date_to
+        )
         return jsonify(summary)
     except Exception as e:
         original_print(f"Error scanning pending TA emails: {e}")
