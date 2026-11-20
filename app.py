@@ -456,8 +456,21 @@ def send_ta_email():
     actual_to = sender_email if is_test else to_email
     actual_cc = []           if is_test else [c.strip() for c in cc_emails_raw.replace(';', ',').split(',') if c.strip()]
     course_shell  = (data.get('course_shell') or '').strip()
-    default_sub   = "Gentle Reminder | Discussion Forum Queries"
-    effective_subject = f"TEST_{subject or default_sub}" if is_test else (subject or default_sub)
+    if not subject:
+        sub_parts = ["Gentle Reminder | Discussion Forum Queries"]
+        if ta_name and "unassigned" not in ta_name.lower():
+            sub_parts.append(ta_name)
+        if course_shell:
+            m_b = re.search(r'(UC|UB|UED|COHORT|C)\s*(\d+)', course_shell, re.IGNORECASE)
+            if m_b:
+                pfx = m_b.group(1).upper()
+                if pfx in ("COHORT", "C"):
+                    pfx = "UC"
+                sub_parts.append(f"{pfx}{m_b.group(2)}")
+        default_sub = " | ".join(sub_parts)
+    else:
+        default_sub = subject
+    effective_subject = f"TEST_{default_sub}" if is_test else default_sub
 
     try:
         msg = MIMEMultipart('alternative')

@@ -2916,6 +2916,45 @@
             selectActiveTa(0);
         }
 
+        function buildTaEmailSubject(group, cohortVal, courseVal) {
+            const base = 'Gentle Reminder | Discussion Forum Queries';
+            const parts = [base];
+
+            // 1. Professor / Faculty Name
+            const rawName = (group && group.ta_name ? group.ta_name : '').trim();
+            const isUnassigned = !rawName || rawName.toLowerCase().includes('unassigned');
+            if (!isUnassigned) {
+                parts.push(rawName);
+            }
+
+            // 2. Batch Name (shortened format instead of full course shell)
+            let batch = (cohortVal || '').trim();
+            if ((!batch || batch === 'N/A' || batch.toUpperCase() === 'ALL') && group && Array.isArray(group.queries)) {
+                const uCohorts = [...new Set(group.queries.map(q => q.cohort).filter(c => c && c !== 'N/A'))];
+                if (uCohorts.length > 0) {
+                    batch = uCohorts.join(', ');
+                }
+            }
+            // Fallback: extract batch from course shell / code if not yet found
+            if (!batch || batch === 'N/A' || batch.toUpperCase() === 'ALL') {
+                const targetCourse = courseVal || (group && group.queries && group.queries[0] ? (group.queries[0].course_shell || group.queries[0].course_code) : '');
+                if (targetCourse) {
+                    const m = targetCourse.match(/(UC|UB|UED|COHORT|C)\s*(\d+)/i);
+                    if (m) {
+                        let pfx = m[1].toUpperCase();
+                        if (pfx === 'COHORT' || pfx === 'C') pfx = 'UC';
+                        batch = `${pfx}${m[2]}`;
+                    }
+                }
+            }
+
+            if (batch && batch !== 'N/A' && batch.toUpperCase() !== 'ALL') {
+                parts.push(batch);
+            }
+
+            return parts.join(' | ');
+        }
+
         function selectActiveTa(idx) {
             activeTaIndex = idx;
             if (!currentScanData || !currentScanData.ta_groups || !currentScanData.ta_groups[idx]) return;
@@ -2984,16 +3023,26 @@
             // Active Cohort Filter & Subject Line formatting
             const activeCohort = (document.getElementById('email-filter-cohort')?.value || currentScanData.cohort_filter || currentScanData.active_cohort_filter || '').trim();
             const isFilteredCohort = activeCohort && activeCohort.toUpperCase() !== 'ALL' && activeCohort !== '';
-            const cohortDisplay = isFilteredCohort
+            let cohortDisplay = isFilteredCohort
                 ? activeCohort
                 : (taUniqueCohorts.length > 0 ? taUniqueCohorts.join(', ') : '');
+
+            // Fallback: extract batch from courseDisplay if cohort was not explicitly present
+            if (!cohortDisplay && courseDisplay) {
+                const batchMatch = courseDisplay.match(/(UC|UB|UED|COHORT|C)\s*(\d+)/i);
+                if (batchMatch) {
+                    let pfx = batchMatch[1].toUpperCase();
+                    if (pfx === 'COHORT' || pfx === 'C') pfx = 'UC';
+                    cohortDisplay = `${pfx}${batchMatch[2]}`;
+                }
+            }
 
             const cohortSubjectSuffix = cohortDisplay ? ` - Cohort ${cohortDisplay}` : '';
             const cohortIntroSuffix = cohortDisplay ? ` (Cohort: ${cohortDisplay})` : '';
 
-            // Subject Line: Clean format "Gentle Reminder | Discussion Forum Queries" (includes cohort if present)
+            // Subject Line: Clean format "Gentle Reminder | Discussion Forum Queries | <Professor Name> | <Batch Name>"
+            const defaultSubject = buildTaEmailSubject(group, cohortDisplay, courseDisplay);
             const subjectInput = document.getElementById('draft-subject-input');
-            const defaultSubject = `Gentle Reminder | Discussion Forum Queries${cohortSubjectSuffix}`;
             if (subjectInput) subjectInput.value = defaultSubject;
 
             // TA name helpers: extract last name for academic salutation
@@ -3284,8 +3333,9 @@ This is an auto-generated email.`;
             }
             const group = currentScanData.ta_groups[activeTaIndex];
             const cfg = getEmailSettings();
+            const fallbackSubject = buildTaEmailSubject(group);
             const subjectInput = document.getElementById('draft-subject-input');
-            const subject = subjectInput && subjectInput.value.trim() ? subjectInput.value.trim() : 'Gentle Reminder | Discussion Forum Queries';
+            const subject = subjectInput && subjectInput.value.trim() ? subjectInput.value.trim() : fallbackSubject;
             const textarea = document.getElementById('draft-body-textarea');
             let bodyText = textarea ? textarea.value.trim() : '';
 
@@ -3328,7 +3378,8 @@ This is an auto-generated email.`;
 
             const subjectInput = document.getElementById('draft-subject-input');
             const courseShellLabel = currentScanData.course_shell || currentScanData.course_code;
-            const subject = subjectInput && subjectInput.value.trim() ? subjectInput.value.trim() : `Gentle Reminder | Discussion Forum Queries`;
+            const fallbackSubject = buildTaEmailSubject(group, null, courseShellLabel);
+            const subject = subjectInput && subjectInput.value.trim() ? subjectInput.value.trim() : fallbackSubject;
             const textarea = document.getElementById('draft-body-textarea');
             const bodyText = textarea ? textarea.value.trim() : '';
             const bodyHtml = buildHtmlBody(bodyText, group);
